@@ -41,7 +41,7 @@ for SSDT-BATT hotpatch guide.
                 self.remove_comment()
 
     def remove_comment(self):
-        string = re.sub(r'/\*[\w\W]*?\*/', "", self.file_content, re.S)
+        string = re.sub(r'/\*[\w\W\n]*?\*/', "", self.file_content)
         print(string)
         pass
 
