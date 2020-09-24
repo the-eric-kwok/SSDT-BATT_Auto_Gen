@@ -3,6 +3,7 @@
 
 import sys
 import os
+import re
 
 
 class AutoGen:
@@ -36,9 +37,12 @@ for SSDT-BATT hotpatch guide.
                 with open(self.filename, 'r') as f:
                     self.file_content = f.read()
                 print(self.filename, self.filepath)
-                print(self.file_content)
+                # print(self.file_content)
+                self.remove_comment()
 
     def remove_comment(self):
+        string = re.sub(r'/\*[\w\W]*?\*/', "", self.file_content, re.S)
+        print(string)
         pass
 
 
