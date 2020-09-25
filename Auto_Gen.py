@@ -4,6 +4,7 @@
 import sys
 import os
 import re
+from multilanguage import *
 
 
 class AutoGen:
@@ -14,16 +15,7 @@ class AutoGen:
         self.find_OperationRegion()
 
     def show_help(self):
-        print('''
-A python script to generate SSDT-BATT from original DSDT.dsl
-Copyright (c) 2020 郭耀铭 All Rights Reserved.
-
-Credit Rehabman for iasl compiler. DalianSky, XStar-Dev, 神楽小白
-for SSDT-BATT hotpatch guide.
-
-    Usage: Auto_Gen.py <DSDT.dsl>
-
-        ''')
+        print(HELP_MESSAGE)
 
     def parse_args(self):
         arg_lens = len(sys.argv)
@@ -37,8 +29,15 @@ for SSDT-BATT hotpatch guide.
             if '.dsl' in arg:
                 self.filename = arg
                 self.filepath = os.path.abspath(arg)
-                with open(self.filename, 'r') as f:
-                    self.file_content = f.read()
+                try:
+                    with open(self.filename, 'r') as f:
+                        self.file_content = f.read()
+                except FileNotFoundError:
+                    print(FILE_NOT_FOUND_MSG)
+                    exit(1)
+                except PermissionError:
+                    print(PERMISSION_MSG)
+                    exit(1)
 
     def remove_comment(self):
         '''
@@ -55,17 +54,20 @@ for SSDT-BATT hotpatch guide.
             r'Device \((H_)?EC[\s\S]*?PNP0C09[\s\S]*}', self.file_content)  # 然后再通过栈的方式截取到配对的大括号结束位置
         bracket_stack = []
         content = ''
-        for char in self.EC_content.group():
-            if char == '{':
-                bracket_stack.append(char)
-            elif char == '}':
-                bracket_stack.pop()
-                if len(bracket_stack) == 0:
-                    content += char
-                    break
-            content += char
+        try:
+            for char in self.EC_content.group():
+                if char == '{':
+                    bracket_stack.append(char)
+                elif char == '}':
+                    bracket_stack.pop()
+                    if len(bracket_stack) == 0:
+                        content += char
+                        break
+                content += char
+        except AttributeError:
+            print(EC_NOT_FOUND_MSG)
+            exit(1)
         self.EC_content = content
-        # print(self.EC_content)
 
     def find_OperationRegion(self):
         '''
@@ -73,12 +75,16 @@ for SSDT-BATT hotpatch guide.
         '''
         OR_info = re.search(  # 使用分组来获得 OperationRegion 的信息
             r"OperationRegion \(([A-Z]{4}), ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\)", self.EC_content)
-        self.OR_info = {
-            "Name": OR_info.group(1),
-            "Storage": OR_info.group(2),
-            "Offset": OR_info.group(3),
-            "Length": OR_info.group(4)
-        }
+        try:
+            self.OR_info = {
+                "Name": OR_info.group(1),
+                "Storage": OR_info.group(2),
+                "Offset": OR_info.group(3),
+                "Length": OR_info.group(4)
+            }
+        except AttributeError:
+            print(OR_NOT_FOUND_MSG)
+            exit(1)
         print("Name:", self.OR_info["Name"])
         print("Storage:", self.OR_info["Storage"])
         print("Offset:", self.OR_info["Offset"])
