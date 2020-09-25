@@ -51,7 +51,8 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     EC_NOT_FOUND_MSG = '該 DSDT 中找不到 EC 設備，是否為台式機？'
     OR_NOT_FOUND_MSG = '該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？'
 
-elif "en" in LANG:
+else:
+    # Fall back to English
     HELP_MESSAGE = '''
 A python script to extract SSDT-BATT battery hotpatch from DSDT.
 Copyright (c) 2020 郭耀铭 All Rights Reserved.

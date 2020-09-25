@@ -50,12 +50,24 @@ class AutoGen:
         '''
         Find EmbeddedController part and store code to self.EC_content
         '''
-        self.EC_content = re.search(  # 匹配 H_EC、EC、EC* 等，[\s\S]是跨行匹配，所以是一直贪婪匹配到最后一个 }
+        try:
+            EC_index = self.file_content.index("PNP0C09")
+        except AttributeError:
+            print(EC_NOT_FOUND_MSG)
+            exit(1)
+        EC_around = self.file_content[EC_index-150:EC_index]
+        self.scope = re.search(r'Scope \((.+?)\)', EC_around).group(1)
+        self.EC_name = re.search(r'Device \((.+?)\)', EC_around).group(1)
+        print(EC_around)
+        print("Scope:", self.scope)
+        print("EC Name:", self.EC_name)
+
+        EC = re.search(  # 匹配 H_EC、EC、EC* 等，[\s\S]是跨行匹配，所以是一直贪婪匹配到最后一个 }
             r'Device \((H_)?EC[\s\S]*?PNP0C09[\s\S]*}', self.file_content)  # 然后再通过栈的方式截取到配对的大括号结束位置
         bracket_stack = []
         content = ''
         try:
-            for char in self.EC_content.group():
+            for char in EC.group():
                 if char == '{':
                     bracket_stack.append(char)
                 elif char == '}':
@@ -68,6 +80,8 @@ class AutoGen:
             print(EC_NOT_FOUND_MSG)
             exit(1)
         self.EC_content = content
+        # print(self.EC_content)
+        #print("Scope:", result.group(1), result.group(2))
 
     def find_OperationRegion(self):
         '''
