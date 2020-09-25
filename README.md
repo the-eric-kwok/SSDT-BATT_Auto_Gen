@@ -1,0 +1,12 @@
+# SSDT-BATT_Auto_Gen
+一个自动从 DSDT 中生成 SSDT-BATT 的 python 脚本
+
+Copyright (c) 2020 郭耀铭 All Rights Reserved.
+
+鸣谢 Rehabman 为 macOS 编译了 iasl 编译器。
+
+鸣谢 DalianSky、XStar-Dev、神楽小白提供了简单易懂的黑苹果电池热补丁教程。
+
+用法: 
+
+    python3 Auto_Gen.py <DSDT.dsl>
