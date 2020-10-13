@@ -75,23 +75,49 @@ class AutoGen:
             elif dsdt_splited[i] == "DefinitionBlock":
                 stack.append("DefinitionBlock")
             elif dsdt_splited[i] == "Field":
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                try:
+                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                except IndexError:
+                    continue
                 stack.append(("Field", name))
             elif dsdt_splited[i] == "IndexField":
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                try:
+                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                except IndexError:
+                    continue
                 stack.append(("IndexField", name))
             elif dsdt_splited[i] == "Scope":
-                path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                try:
+                    path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                except IndexError:
+                    continue
                 stack.append(("Scope", path))
+                #print("Scope", path)
             elif dsdt_splited[i] == "Method":
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                try:
+                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                except IndexError:
+                    continue
                 stack.append(("Method", name))
+                #print("Method", name)
+                #if name == "EODD":
+                #    print()
             elif dsdt_splited[i] == "Device":
-                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                try:
+                    name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                except IndexError:
+                    continue
                 stack.append(("Device", name))
+                #print("Device", name)
+                #if name == "HTAM":
+                #    print()
             elif dsdt_splited[i] == "ThermalZone":
-                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                try:
+                    name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                except IndexError:
+                    continue
                 stack.append(("ThermalZone", name))
+
             elif dsdt_splited[i] == "If":
                 stack.append(None)
             elif dsdt_splited[i] == "Else":
@@ -106,15 +132,15 @@ class AutoGen:
                 stack.append(None)
             elif dsdt_splited[i] == "While":
                 stack.append(None)
-            elif dsdt_splited[i] == "Buffer" or dsdt_splited[i] == "(Buffer":
+            elif dsdt_splited[i] in ("Buffer" ,"(Buffer"):
                 stack.append(None)
-            elif dsdt_splited[i] == "Package" or dsdt_splited[i] == "(Package":
+            elif dsdt_splited[i] in ("Package", "(Package"):
                 stack.append(None)
             elif dsdt_splited[i] == "IRQ":
                 stack.append(None)
             elif dsdt_splited[i] == "IRQNoFlags":
                 stack.append(None)
-            elif dsdt_splited[i] == "ResourceTemplate":
+            elif dsdt_splited[i] in ("ResourceTemplate", "(ResourceTemplate"):
                 stack.append(None)
             elif dsdt_splited[i] == "Interrupt":
                 stack.append(None)
@@ -130,7 +156,7 @@ class AutoGen:
                 stack.append(None)
             elif dsdt_splited[i] == "PowerResource":
                 stack.append(None)
-            elif dsdt_splited[i] == "DMA":
+            elif dsdt_splited[i] in ("DMA", "(DMA"):
                 stack.append(None)
 
             elif "}" in dsdt_splited[i]:
