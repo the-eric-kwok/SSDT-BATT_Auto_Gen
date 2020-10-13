@@ -5,13 +5,16 @@ import sys
 import os
 import re
 from multilanguage import *
+from tree import parse_dsdt
 
 
 class AutoGen:
     def __init__(self) -> None:
         self.parse_args()
         self.remove_comment()
-        self.find_EC()
+        self.remove_external()
+        self.parse_dsdt(self.file_content)
+        # self.find_EC()
         self.find_OperationRegion()
 
     def show_help(self):
@@ -41,26 +44,109 @@ class AutoGen:
 
     def remove_comment(self):
         '''
-        Removes block comment
+        Removes comments
         '''
-        # \w\W 跨行匹配
+        # \w\W 跨行匹配，去除段注释
         self.file_content = re.sub(r'/\*[\w\W\n]*?\*/', "", self.file_content)
+        # 去除行注释
+        self.file_content = re.sub(r'//.*', '', self.file_content)
 
-    def find_EC(self):
+    def remove_external(self):
+        self.file_content = re.sub(r'External.*\n', "", self.file_content)
+
+    def parse_dsdt(self, dsdt_content: str):
+        #root = Node("\\")
+        #tree = Tree(root)
+        stack = []
+        dsdt_splited = dsdt_content.split()
+        for i in range(0, len(dsdt_splited)):
+            word = dsdt_splited[i]
+            if "PNP0C09" in dsdt_splited[i]:
+                path = ""
+                for item in stack[1:]:
+                    if item:
+                        if item[0] == 'Scope':
+                            path = item[1]
+                        elif item[0] == 'Device':
+                            path += '.'
+                            path += item[1]
+                print("Path:", path)
+                pass
+            elif dsdt_splited[i] == "DefinitionBlock":
+                stack.append("DefinitionBlock")
+            elif dsdt_splited[i] == "Field":
+                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                stack.append(("Field", name))
+            elif dsdt_splited[i] == "IndexField":
+                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                stack.append(("IndexField", name))
+            elif dsdt_splited[i] == "Scope":
+                path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                stack.append(("Scope", path))
+            elif dsdt_splited[i] == "Method":
+                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                stack.append(("Method", name))
+            elif dsdt_splited[i] == "Device":
+                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                stack.append(("Device", name))
+            elif dsdt_splited[i] == "ThermalZone":
+                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
+                stack.append(("ThermalZone", name))
+            elif dsdt_splited[i] == "If":
+                stack.append(None)
+            elif dsdt_splited[i] == "Else":
+                stack.append(None)
+            elif dsdt_splited[i] == "ElseIf":
+                stack.append(None)
+            elif dsdt_splited[i] == "Switch":
+                stack.append(None)
+            elif dsdt_splited[i] == "Case":
+                stack.append(None)
+            elif dsdt_splited[i] == "Default":
+                stack.append(None)
+            elif dsdt_splited[i] == "While":
+                stack.append(None)
+            elif dsdt_splited[i] == "Buffer" or dsdt_splited[i] == "(Buffer":
+                stack.append(None)
+            elif dsdt_splited[i] == "Package" or dsdt_splited[i] == "(Package":
+                stack.append(None)
+            elif dsdt_splited[i] == "IRQ":
+                stack.append(None)
+            elif dsdt_splited[i] == "IRQNoFlags":
+                stack.append(None)
+            elif dsdt_splited[i] == "ResourceTemplate":
+                stack.append(None)
+            elif dsdt_splited[i] == "Interrupt":
+                stack.append(None)
+            elif dsdt_splited[i] == "GpioInt":
+                stack.append(None)
+            elif dsdt_splited[i] == "GpioIo":
+                stack.append(None)
+            elif dsdt_splited[i] == "StartDependentFn":
+                stack.append(None)
+            elif dsdt_splited[i] == "StartDependentFnNoPri":
+                stack.append(None)
+            elif dsdt_splited[i] == "Processor":
+                stack.append(None)
+            elif dsdt_splited[i] == "PowerResource":
+                stack.append(None)
+            elif dsdt_splited[i] == "DMA":
+                stack.append(None)
+
+            elif "}" in dsdt_splited[i]:
+                stack.pop()
+                pass
+
+    @property
+    def EC_content(self):
         '''
-        Find EmbeddedController part and store code to self.EC_content
+        Find EmbeddedController part in dsl and return it
         '''
         try:
             EC_index = self.file_content.index("PNP0C09")
         except AttributeError:
             print(EC_NOT_FOUND_MSG)
             exit(1)
-        EC_around = self.file_content[EC_index-150:EC_index]
-        self.scope = re.search(r'Scope \((.+?)\)', EC_around).group(1)
-        self.EC_name = re.search(r'Device \((.+?)\)', EC_around).group(1)
-        print(EC_around)
-        print("Scope:", self.scope)
-        print("EC Name:", self.EC_name)
 
         EC = re.search(  # 匹配 H_EC、EC、EC* 等，[\s\S]是跨行匹配，所以是一直贪婪匹配到最后一个 }
             r'Device \((H_)?EC[\s\S]*?PNP0C09[\s\S]*}', self.file_content)  # 然后再通过栈的方式截取到配对的大括号结束位置
@@ -79,9 +165,7 @@ class AutoGen:
         except AttributeError:
             print(EC_NOT_FOUND_MSG)
             exit(1)
-        self.EC_content = content
-        # print(self.EC_content)
-        #print("Scope:", result.group(1), result.group(2))
+        return content
 
     def find_OperationRegion(self):
         '''

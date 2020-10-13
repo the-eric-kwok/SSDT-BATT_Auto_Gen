@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "DSDT 3.dsl"
+                "dsdt.dsl"
             ]
         }
     ]
