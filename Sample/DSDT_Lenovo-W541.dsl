@@ -5,7 +5,7 @@
  * 
  * Disassembling to symbolic ASL+ operators
  *
- * Disassembly of /Users/eric/Downloads/CLOVER_USB定制/ACPI/origin/DSDT.aml, Mon Sep 21 13:20:55 2020
+ * Disassembly of /Volumes/Data/eric/Downloads/CLOVER_USB定制_lenovo-W541/ACPI/origin/DSDT.aml, Sat Sep 26 22:12:02 2020
  *
  * Original Table Header:
  *     Signature        "DSDT"

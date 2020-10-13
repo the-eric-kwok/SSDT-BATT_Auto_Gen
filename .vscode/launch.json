@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "Sample/dsdt 4.dsl"
+                "Sample/DSDT_Dell-Inspiron-5584.dsl"
             ]
         }
     ]

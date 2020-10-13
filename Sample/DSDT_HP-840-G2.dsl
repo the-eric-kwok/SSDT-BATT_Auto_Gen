@@ -5,7 +5,7 @@
  * 
  * Disassembling to symbolic ASL+ operators
  *
- * Disassembly of /Volumes/Data/eric/Downloads/EFI_电池补丁HP-840G2/OC/ACPI/origin/dsdt.aml, Tue Oct 13 11:04:28 2020
+ * Disassembly of /Volumes/Data/eric/Downloads/EFI_电池补丁HP-840G2/OC/ACPI/origin/dsdt.aml, Tue Oct 13 12:04:30 2020
  *
  * Original Table Header:
  *     Signature        "DSDT"
