@@ -63,7 +63,7 @@ class AutoGen:
             word = dsdt_splited[i]
             if "PNP0C09" in dsdt_splited[i]:
                 path = ""
-                for item in stack[1:]:
+                for item in stack:
                     if item:
                         if item[0] == 'Scope':
                             path = item[1]
@@ -100,7 +100,7 @@ class AutoGen:
                     continue
                 stack.append(("Method", name))
                 #print("Method", name)
-                #if name == "EODD":
+                #if name == "_CRS":
                 #    print()
             elif dsdt_splited[i] == "Device":
                 try:
@@ -109,7 +109,7 @@ class AutoGen:
                     continue
                 stack.append(("Device", name))
                 #print("Device", name)
-                #if name == "HTAM":
+                #if name == "SRRE":
                 #    print()
             elif dsdt_splited[i] == "ThermalZone":
                 try:
@@ -118,7 +118,7 @@ class AutoGen:
                     continue
                 stack.append(("ThermalZone", name))
 
-            elif dsdt_splited[i] == "If":
+            elif dsdt_splited[i] in ("If", "(If"):
                 stack.append(None)
             elif dsdt_splited[i] == "Else":
                 stack.append(None)
