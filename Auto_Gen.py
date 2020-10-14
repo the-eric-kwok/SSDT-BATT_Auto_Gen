@@ -239,6 +239,7 @@ class AutoGen:
         if self.verbose:
             for item in self.OR_info:
                 print(item)
+            print()
 
 
 if __name__ == '__main__':
