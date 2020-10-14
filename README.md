@@ -1,6 +1,9 @@
 # SSDT-BATT_Auto_Gen
 一个自动从 DSDT 中生成 SSDT-BATT 的 python 脚本
 
+**此工程为正在开发状态，尚不能正常工作，敬请关注**
+**This project is now WIP, please stay tuned**
+
 Copyright (c) 2020 郭耀铭 All Rights Reserved.
 
 鸣谢 Rehabman 为 macOS 编译了 iasl 编译器。
