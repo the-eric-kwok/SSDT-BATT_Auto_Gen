@@ -459,19 +459,13 @@ class AutoGen:
         self.modified_fieldunit = []
         self.file_generated = 'DefinitionBlock("", "SSDT", 2, "ERIC", "BATT", 0x00000000)\n{\n'
         for OR_info in self.OR_info:
-            modified = False  # 是否进行了变量拆分
-            content = self.get_content(OR_info["Path"]+'.'+OR_info["Name"])
-            # print('\n\n', OR_info, '\n', content)
+            OR_path = OR_info["Path"]+'.'+OR_info["Name"]
+            content = self.get_content(OR_path)
             splited = content.split("}")
             for field in splited[:-1]:
-                modified = False
+                flag = False  # 该Field中是否有需要特殊读写的变量？
                 tmp = field.split('{')
-                new_OR_name = self.rename(OR_info["Name"])
-                field_info = re.sub(OR_info["Name"], new_OR_name, tmp[0])
                 field_content = tmp[1].split('\n')
-                generated = "    Scope (% s)\n    {\n        OperationRegion(%s, % s, % s, % s)\n" % (
-                    OR_info["Path"], new_OR_name, OR_info["Storage"], OR_info["Offset"], OR_info["Length"])
-                generated += '        ' + field_info.strip() + '\n        {'
                 offset_bit = 0  # Offset in bits
                 name = ''
                 size = 0
@@ -488,33 +482,28 @@ class AutoGen:
                                 print(FIELD_UNIT_OFFSET_ERROR_MSG)
                                 exit(2)
                             self.modified_fieldunit.append(
-                                {"name": name, "offset": int(offset_bit/8), "size": size})
-                            generated += '\n            , %d, //%s' % (
-                                size, name)
-                            modified = True
-                        else:
-                            generated += '\n            , %d,' % size
+                                {"name": name, "offset": int(offset_bit/8), "size": size, "OR path": OR_path})
+                            flag = True
                         offset_bit += size
                     else:
                         item = item.strip()
-                        generated += ('\n            '+item)
                         offset = re.search(r'Offset \((.*)\)', item).group(1)
                         offset_bit = int(offset, 16) * 8
-                # print(field_content)
-                generated += '\n        }\n'
-                # print(generated)
-                if modified:
-                    self.file_generated += generated
-                    if OR_info["Storage"] in self.file_generated:
+
+                if flag:
+                    if OR_info["Storage"] not in self.file_generated and OR_info["Path"] not in self.file_generated:
                         RE1B = self.rename('R1B')
                         RECB = self.rename('RDB')
                         ERM2 = self.rename('MEM')
                         WE1B = self.rename('W1B')
                         WECB = self.rename('WRB')
                         for item in self.modified_fieldunit:
-                            item["read method"] = RECB
-                            item["write method"] = WECB
+                            if item["OR path"] == OR_path:
+                                item["read method"] = RECB
+                                item["write method"] = WECB
                         self.file_generated += '''
+    Scope (%s)
+    {
         Method (%s, 1, NotSerialized)
         {
             OperationRegion (%s, %s, Arg0, One)
@@ -573,8 +562,12 @@ class AutoGen:
             }
         }
     }
-''' % (RE1B, ERM2, OR_info["Storage"], ERM2, RECB, WE1B, ERM2, OR_info["Storage"], ERM2, WECB)
+''' % (OR_info["Path"], RE1B, ERM2, OR_info["Storage"], ERM2, RECB, WE1B, ERM2, OR_info["Storage"], ERM2, WECB)
         print(self.file_generated)
+
+    def patch_method(self):
+        for unit in self.modified_fieldunit:
+            pass
 
 
 if __name__ == '__main__':
