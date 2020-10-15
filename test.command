@@ -1,0 +1,1 @@
+find Sample -name "*.dsl" -type f -print -exec ./Auto_Gen.py {} \;

@@ -434,6 +434,64 @@ class AutoGen:
                 print(item)
             print()
 
+    def field_unit_naming(self, orig_name: str, size: int):
+        '''
+        Method to give names to seperated field units.
+
+        @param: orig_name(str) - original field unit name
+
+        @param: size(int) - size of original field unit, must between 16 or 32
+
+        @return: tuple (name0, name1) if size is 16
+
+        @return: tuple (name0, name1, name2, name3) if size is 32
+
+        @raises: RuntimeError if size is neither 16 nor 32
+        '''
+        alphabet = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                    'A', 'B', 'C', 'D', 'E', 'F', 'G',
+                    'H', 'I', 'J', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T',
+                    'U', 'V', 'W', 'X', 'Y', 'Z')
+        if size == 16:
+            for i in range(0, int(len(alphabet)/2)):
+                name0 = orig_name[:3]+alphabet[2*i]
+                name1 = orig_name[:3]+alphabet[2*i+1]
+                names = (name0, name1)
+                if self.file_content.find(name0) == -1 and self.file_content.find(name1) == -1:
+                    # Check if generated name exists in self.file_content
+                    hit = False
+                    for item in self._16bit:
+                        if item["name0"] in names or item["name1"] in names:
+                            hit = True
+                    for item in self._32bit:
+                        if item["name0"] in names or item["name1"] in names or item["name2"] in names or item["name3"] in names:
+                            hit = True
+                    if not hit:
+                        return (name0, name1)
+
+        elif size == 32:
+            for i in range(0, int(len(alphabet)/4)):
+                name0 = orig_name[:3]+alphabet[4*i]
+                name1 = orig_name[:3]+alphabet[4*i+1]
+                name2 = orig_name[:3]+alphabet[4*i+2]
+                name3 = orig_name[:3]+alphabet[4*i+3]
+                names = (name0, name1, name2, name3)
+                if self.file_content.find(name0) == -1 and self.file_content.find(name1) == -1 and self.file_content.find(name2) == -1 and self.file_content.find(name3) == -1:
+                    # Check if generated name exists in self.file_content
+                    hit = False
+                    for item in self._16bit:
+                        if item["name0"] in names or item["name1"] in names:
+                            hit = True
+                    for item in self._32bit:
+                        if item["name0"] in names or item["name1"] in names or item["name2"] in names or item["name3"] in names:
+                            hit = True
+
+                    if not hit:
+                        return names
+        else:
+            raise RuntimeError
+
     def find_field(self):
         self._16bit = []
         self._32bit = []
@@ -441,7 +499,7 @@ class AutoGen:
         self.field_generated = ''
         for OR_info in self.OR_info:
             content = self.get_content(OR_info["Path"]+'.'+OR_info["Name"])
-            count = content.count("{")
+            #print('\n\n', OR_info, '\n', content)
             splited = content.split("}")
             for field in splited[:-1]:
                 tmp = field.split('{')
@@ -463,30 +521,16 @@ class AutoGen:
                         size = int(a[1].strip())
                         if size == 16 and name != '':
                             # 16 bit FieldUnit
-                            name0 = name1 = ''
-                            for i in range(0, 4):
-                                if content.find(name[:-1]+str(2*i)) == -1:
-                                    name0 = name[:-1]+str(2*i)
-                                    if content.find(name[:-1]+str(2*i+1)) == -1:
-                                        name1 = name[:-1]+str(2*i+1)
-                                        break
+                            name0, name1 = self.field_unit_naming(
+                                name, 16, content)
                             self._16bit.append(
                                 {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1})
                             generated += ('\n    ' + name0 +
                                           ', 8, ' + name1 + ', 8,')
                         elif size == 32 and name != '':
                             # 32 bit FieldUnit
-                            name0 = name1 = name2 = name3 = ''
-                            for i in range(0, 1):
-                                if content.find(name[:-1]+str(4*i)) == -1:
-                                    name0 = name[:-1]+str(4*i)
-                                    if content.find(name[:-1]+str(4*i+1)) == -1:
-                                        name1 = name[:-1]+str(4*i+1)
-                                        if content.find(name[:-1]+str(4*i+2)) == -1:
-                                            name2 = name[:-1]+str(4*i+2)
-                                            if content.find(name[:-1]+str(4*i+3)) == -1:
-                                                name3 = name[:-1]+str(4*i+3)
-                                                break
+                            name0, name1, name2, name3 = self.field_unit_naming(
+                                name, 32, content)
                             self._32bit.append(
                                 {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1, "name2": name2, "name3": name3})
                             generated += ('\n    ' + name0 + ', 8,' + name1 +
@@ -508,7 +552,7 @@ class AutoGen:
                 generated += '\n}\n'
                 # print(generated)
                 self.field_generated += generated
-            print(self.field_generated)
+        print(self.field_generated)
 
 
 if __name__ == '__main__':
