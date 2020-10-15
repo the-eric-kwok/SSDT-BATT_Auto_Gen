@@ -517,6 +517,7 @@ class AutoGen:
 
         Method (%s, 2, Serialized)
         {
+            // RECB or RSMB
             // Arg0 - offset in bytes from zero-based EC
             // Arg1 - size of buffer in bits
             Arg1 = ((Arg1 + 0x07) >> 0x03)
@@ -525,7 +526,7 @@ class AutoGen:
             Local0 = Zero
             While ((Arg0 < Arg1))
             {
-                TEMP [Local0] = RE1B (Arg0)
+                TEMP [Local0] = %s (Arg0)
                 Arg0++
                 Local0++
             }
@@ -546,6 +547,7 @@ class AutoGen:
 
         Method (%s, 3, Serialized)
         {
+            // WECB or WSMB
             // Arg0 - offset in bytes from zero-based EC
             // Arg1 - size of buffer in bits
             // Arg2 - data to be written
@@ -556,13 +558,16 @@ class AutoGen:
             Local0 = Zero
             While ((Arg0 < Arg1))
             {
-                WE1B (Arg0, DerefOf (TEMP [Local0]))
+                %s (Arg0, DerefOf (TEMP [Local0]))
                 Arg0++
                 Local0++
             }
         }
     }
-''' % (OR_info["Path"], RE1B, ERM2, OR_info["Storage"], ERM2, RECB, WE1B, ERM2, OR_info["Storage"], ERM2, WECB)
+''' % (OR_info["Path"], RE1B, ERM2, OR_info["Storage"], ERM2, RECB, RE1B, WE1B, ERM2, OR_info["Storage"], ERM2, WECB, WE1B)
+        if "RECB" not in self.file_generated:
+            print(NOT_NEED_TO_PATCH)
+            exit(0)
         print(self.file_generated)
 
     def patch_method(self):

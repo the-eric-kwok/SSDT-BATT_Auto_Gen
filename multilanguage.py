@@ -11,6 +11,7 @@ Usage:
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
+NOT_NEED_TO_PATCH = 'This DSDT does not need to be patched! Put SMCBatteryManager.kext in and enjoy!'
 FILE_NOT_FOUND_MSG = '\033[1;31mFile not found, please re-check file name.\033[0m'
 PERMISSION_MSG = '\033[1;31mFile no R/W permission\033[0m'
 EC_NOT_FOUND_MSG = '\033[1;31mCannot found EC device in this DSDT.\033[0m'
@@ -31,6 +32,7 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
+    NOT_NEED_TO_PATCH = '该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！'
     FILE_NOT_FOUND_MSG = '\033[1;31m未找到该文件，请检查文件名拼写\033[0m'
     PERMISSION_MSG = '\033[1;31m文件无读写权限，请检查权限设置\033[0m'
     EC_NOT_FOUND_MSG = '\033[1;31m该 DSDT 中找不到 EC 设备\033[0m'
@@ -49,6 +51,7 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
+    NOT_NEED_TO_PATCH = '該 DSDT 不需要打補丁即可正常顯示電量，放入 SMCBatteryManager.kext 即可！'
     FILE_NOT_FOUND_MSG = '\033[1;31m未找到該文件，請檢查文件名拼寫\033[0m'
     PERMISSION_MSG = '\033[1;31m文件無讀寫權限，請檢查權限設置\033[0m'
     EC_NOT_FOUND_MSG = '\033[1;31m該 DSDT 中找不到 EC 設備\033[0m'
