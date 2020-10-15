@@ -1,22 +1,24 @@
 import os
 
-LANG = ""
-HELP_MESSAGE = ""
-FILE_NOT_FOUND_MSG = ""
-PERMISSION_MSG = ""
-EC_NOT_FOUND_MSG = ""
-OR_NOT_FOUND_MSG = ""
+HELP_MESSAGE = '''
+A python script to extract SSDT-BATT battery hotpatch from DSDT.
+Copyright (c) 2020 郭耀铭 All Rights Reserved.
+
+Credit: Rehabman for iasl compiler, DalianSky, XStar-Dev, 神楽小白
+for simple-to-follow battery hotpatching guide.
+
+Usage:
+    python3 Auto_Gen.py <DSDT.dsl>
+
+'''
+FILE_NOT_FOUND_MSG = '\033[1;31mFile not found, please re-check file name.\033[0m'
+PERMISSION_MSG = '\033[1;31mFile no R/W permission\033[0m'
+EC_NOT_FOUND_MSG = '\033[1;31mCannot found EC device in this DSDT.\033[0m'
+OR_NOT_FOUND_MSG = '\033[1;31mCannot found any OperationRegion from EC device, is it from a desktop computer?\033[0m'
+FIELD_UNIT_OFFSET_ERROR_MSG = "\033[1;31mSome Field Units that needed to be patch cannot be devided by 8 excaly. It seems like your DSDT is being modified uncorrectlly, please re-dump DSDT.\033[0m"
 
 
-def language_choose():
-    '''
-    Multilanguage support
-    '''
-    global LANG
-    LANG = os.environ.get('LANG').split('.')[0]
-
-
-language_choose()
+LANG = os.environ.get('LANG').split('.')[0]
 if LANG == "zh_CN":
     HELP_MESSAGE = '''
 一个自动从 DSDT 中生成 SSDT-BATT 的 python 脚本
@@ -33,6 +35,7 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     PERMISSION_MSG = '\033[1;31m文件无读写权限，请检查权限设置\033[0m'
     EC_NOT_FOUND_MSG = '\033[1;31m该 DSDT 中找不到 EC 设备\033[0m'
     OR_NOT_FOUND_MSG = '\033[1;31m该 DSDT 的 EC 设备中没有任何的 OperationRegion，是否为台式机？\033[0m'
+    FIELD_UNIT_OFFSET_ERROR_MSG = '\033[1;31m此DSDT中某些要处理的FieldUnit偏移量不能被8整除，看起来你的DSDT被不正确地修改过，请重新导出DSDT\033[0m'
 
 elif "zh" in LANG:
     HELP_MESSAGE = '''
@@ -50,21 +53,4 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     PERMISSION_MSG = '\033[1;31m文件無讀寫權限，請檢查權限設置\033[0m'
     EC_NOT_FOUND_MSG = '\033[1;31m該 DSDT 中找不到 EC 設備\033[0m'
     OR_NOT_FOUND_MSG = '\033[1;31m該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？\033[0m'
-
-else:
-    # Fall back to English
-    HELP_MESSAGE = '''
-A python script to extract SSDT-BATT battery hotpatch from DSDT.
-Copyright (c) 2020 郭耀铭 All Rights Reserved.
-
-Credit: Rehabman for iasl compiler, DalianSky, XStar-Dev, 神楽小白
-for simple-to-follow battery hotpatching guide.
-
-Usage:
-    python3 Auto_Gen.py <DSDT.dsl>
-
-'''
-    FILE_NOT_FOUND_MSG = '\033[1;31mFile not found, please re-check file name.\033[0m'
-    PERMISSION_MSG = '\033[1;31mFile no R/W permission\033[0m'
-    EC_NOT_FOUND_MSG = '\033[1;31mCannot found EC device in this DSDT.\033[0m'
-    OR_NOT_FOUND_MSG = '\033[1;31mCannot found any OperationRegion from EC device, is it from a desktop computer?\033[0m'
+    FIELD_UNIT_OFFSET_ERROR_MSG = '\033[1;31m此DSDT中某些要處理的FieldUnit的偏移量不能被8整除，看起來你的DSDT被不正確地修改過，請重新導出DSDT\033[0m'

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from os import devnull
+from os import devnull, rename
 import sys
 import os
 import re
-from types import TracebackType
+from types import TracebackType, new_class
 from multilanguage import *
 
 
@@ -14,6 +14,9 @@ class AutoGen:
     EC_path = []
     verbose = False
     debug = False
+    head = """DefinitionBlock ("", "SSDT", 2, "ERIC", "BATT", 0x00000000)
+{
+"""
 
     def __init__(self) -> None:
         self.parse_args()
@@ -434,80 +437,41 @@ class AutoGen:
                 print(item)
             print()
 
-    def field_unit_naming(self, orig_name: str, size: int):
+    def rename(self, orig_name: str):
         '''
-        Method to give names to seperated field units.
+        Method to rename anything without conflicting.
 
-        @param: orig_name(str) - original field unit name
+        @param: orig_name(str) - original name
 
-        @param: size(int) - size of original field unit, must between 16 or 32
-
-        @return: tuple (name0, name1) if size is 16
-
-        @return: tuple (name0, name1, name2, name3) if size is 32
-
-        @raises: RuntimeError if size is neither 16 nor 32
+        @return: new_name(str) - renamed name
         '''
         alphabet = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
                     'A', 'B', 'C', 'D', 'E', 'F', 'G',
                     'H', 'I', 'J', 'K', 'L', 'M', 'N',
                     'O', 'P', 'Q', 'R', 'S', 'T',
                     'U', 'V', 'W', 'X', 'Y', 'Z')
-        if size == 16:
-            for i in range(0, int(len(alphabet)/2)):
-                name0 = orig_name[:3]+alphabet[2*i]
-                name1 = orig_name[:3]+alphabet[2*i+1]
-                names = (name0, name1)
-                if self.file_content.find(name0) == -1 and self.file_content.find(name1) == -1:
-                    # Check if generated name exists in self.file_content
-                    hit = False
-                    for item in self._16bit:
-                        if item["name0"] in names or item["name1"] in names:
-                            hit = True
-                    for item in self._32bit:
-                        if item["name0"] in names or item["name1"] in names or item["name2"] in names or item["name3"] in names:
-                            hit = True
-                    if not hit:
-                        return (name0, name1)
-
-        elif size == 32:
-            for i in range(0, int(len(alphabet)/4)):
-                name0 = orig_name[:3]+alphabet[4*i]
-                name1 = orig_name[:3]+alphabet[4*i+1]
-                name2 = orig_name[:3]+alphabet[4*i+2]
-                name3 = orig_name[:3]+alphabet[4*i+3]
-                names = (name0, name1, name2, name3)
-                if self.file_content.find(name0) == -1 and self.file_content.find(name1) == -1 and self.file_content.find(name2) == -1 and self.file_content.find(name3) == -1:
-                    # Check if generated name exists in self.file_content
-                    hit = False
-                    for item in self._16bit:
-                        if item["name0"] in names or item["name1"] in names:
-                            hit = True
-                    for item in self._32bit:
-                        if item["name0"] in names or item["name1"] in names or item["name2"] in names or item["name3"] in names:
-                            hit = True
-
-                    if not hit:
-                        return names
-        else:
-            raise RuntimeError
+        for char in alphabet:
+            new_name = orig_name[:3]+char
+            if self.file_content.find(new_name) == -1:
+                return new_name
 
     def find_field(self):
-        self._16bit = []
-        self._32bit = []
-        self._larger_bit = []
-        self.field_generated = ''
+        self.modified_fieldunit = []
+        self.file_generated = 'DefinitionBlock("", "SSDT", 2, "ERIC", "BATT", 0x00000000)\n{\n'
         for OR_info in self.OR_info:
+            modified = False  # 是否进行了变量拆分
             content = self.get_content(OR_info["Path"]+'.'+OR_info["Name"])
-            #print('\n\n', OR_info, '\n', content)
+            # print('\n\n', OR_info, '\n', content)
             splited = content.split("}")
             for field in splited[:-1]:
+                modified = False
                 tmp = field.split('{')
-                field_info = tmp[0]
+                new_OR_name = self.rename(OR_info["Name"])
+                field_info = re.sub(OR_info["Name"], new_OR_name, tmp[0])
                 field_content = tmp[1].split('\n')
-                generated = "OperationRegion (%s, %s, %s, %s)\n" % (
-                    OR_info["Name"], OR_info["Storage"], OR_info["Offset"], OR_info["Length"])
-                generated += field_info.strip() + '\n{'
+                generated = "    Scope (% s)\n    {\n        OperationRegion(%s, % s, % s, % s)\n" % (
+                    OR_info["Path"], new_OR_name, OR_info["Storage"], OR_info["Offset"], OR_info["Length"])
+                generated += '        ' + field_info.strip() + '\n        {'
                 offset_bit = 0  # Offset in bits
                 name = ''
                 size = 0
@@ -519,39 +483,98 @@ class AutoGen:
                         a = item.split(',')
                         name = a[0].strip()
                         size = int(a[1].strip())
-                        if size == 16 and name != '':
-                            # 16 bit FieldUnit
-                            name0, name1 = self.field_unit_naming(name, 16)
-                            self._16bit.append(
-                                {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1})
-                            generated += ('\n    ' + name0 +
-                                          ', 8, ' + name1 + ', 8,')
-                        elif size == 32 and name != '':
-                            # 32 bit FieldUnit
-                            name0, name1, name2, name3 = self.field_unit_naming(
-                                name, 32)
-                            self._32bit.append(
-                                {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1, "name2": name2, "name3": name3})
-                            generated += ('\n    ' + name0 + ', 8,' + name1 +
-                                          ', 8, ' + name2 + ', 8, ' + name3 + ', 8,')
-                        elif size > 32 and name != '':
-                            # Larger bit FieldUnit
-                            self._larger_bit.append(
+                        if size > 8 and name != '':
+                            if offset_bit/8 - int(offset_bit/8) != 0:
+                                print(FIELD_UNIT_OFFSET_ERROR_MSG)
+                                exit(2)
+                            self.modified_fieldunit.append(
                                 {"name": name, "offset": int(offset_bit/8), "size": size})
-                            generated += '\n    , %d,' % size
+                            generated += '\n            , %d, //%s' % (
+                                size, name)
+                            modified = True
                         else:
-                            generated += '\n    , %d,' % size
+                            generated += '\n            , %d,' % size
                         offset_bit += size
                     else:
                         item = item.strip()
-                        generated += ('\n    '+item)
+                        generated += ('\n            '+item)
                         offset = re.search(r'Offset \((.*)\)', item).group(1)
                         offset_bit = int(offset, 16) * 8
                 # print(field_content)
-                generated += '\n}\n'
+                generated += '\n        }\n'
                 # print(generated)
-                self.field_generated += generated
-        print(self.field_generated)
+                if modified:
+                    self.file_generated += generated
+                    if OR_info["Storage"] in self.file_generated:
+                        RE1B = self.rename('R1B')
+                        RECB = self.rename('RDB')
+                        ERM2 = self.rename('MEM')
+                        WE1B = self.rename('W1B')
+                        WECB = self.rename('WRB')
+                        for item in self.modified_fieldunit:
+                            item["read method"] = RECB
+                            item["write method"] = WECB
+                        self.file_generated += '''
+        Method (%s, 1, NotSerialized)
+        {
+            OperationRegion (%s, %s, Arg0, One)
+            Field (%s, ByteAcc, NoLock, Preserve)
+            {
+                BYTE,   8
+            }
+
+            Return (BYTE) /* \RE1B.BYTE */
+        }
+
+        Method (%s, 2, Serialized)
+        {
+            // Arg0 - offset in bytes from zero-based EC
+            // Arg1 - size of buffer in bits
+            Arg1 = ((Arg1 + 0x07) >> 0x03)
+            Name (TEMP, Buffer (Arg1){})
+            Arg1 += Arg0
+            Local0 = Zero
+            While ((Arg0 < Arg1))
+            {
+                TEMP [Local0] = RE1B (Arg0)
+                Arg0++
+                Local0++
+            }
+
+            Return (TEMP) /* \RECB.TEMP */
+        }
+
+        Method (%s, 2, NotSerialized)
+        {
+            OperationRegion (%s, %s, Arg0, One)
+            Field (%s, ByteAcc, NoLock, Preserve)
+            {
+                BYTE,   8
+            }
+
+            BYTE = Arg1
+        }
+
+        Method (%s, 3, Serialized)
+        {
+            // Arg0 - offset in bytes from zero-based EC
+            // Arg1 - size of buffer in bits
+            // Arg2 - data to be written
+            Arg1 = ((Arg1 + 0x07) >> 0x03)
+            Name (TEMP, Buffer (Arg1){})
+            TEMP = Arg2
+            Arg1 += Arg0
+            Local0 = Zero
+            While ((Arg0 < Arg1))
+            {
+                WE1B (Arg0, DerefOf (TEMP [Local0]))
+                Arg0++
+                Local0++
+            }
+        }
+    }
+''' % (RE1B, ERM2, OR_info["Storage"], ERM2, RECB, WE1B, ERM2, OR_info["Storage"], ERM2, WECB)
+        print(self.file_generated)
 
 
 if __name__ == '__main__':
