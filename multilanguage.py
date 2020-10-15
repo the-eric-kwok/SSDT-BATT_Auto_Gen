@@ -29,10 +29,10 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
-    FILE_NOT_FOUND_MSG = '未找到该文件，请检查文件名拼写'
-    PERMISSION_MSG = '文件无读写权限，请检查权限设置'
-    EC_NOT_FOUND_MSG = '该 DSDT 中找不到 EC 设备，是否为台式机？'
-    OR_NOT_FOUND_MSG = '该 DSDT 的 EC 设备中没有任何的 OperationRegion，是否为台式机？'
+    FILE_NOT_FOUND_MSG = '\033[1;31m未找到该文件，请检查文件名拼写\033[0m'
+    PERMISSION_MSG = '\033[1;31m文件无读写权限，请检查权限设置\033[0m'
+    EC_NOT_FOUND_MSG = '\033[1;31m该 DSDT 中找不到 EC 设备\033[0m'
+    OR_NOT_FOUND_MSG = '\033[1;31m该 DSDT 的 EC 设备中没有任何的 OperationRegion，是否为台式机？\033[0m'
 
 elif "zh" in LANG:
     HELP_MESSAGE = '''
@@ -46,10 +46,10 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
-    FILE_NOT_FOUND_MSG = '未找到該文件，請檢查文件名拼寫'
-    PERMISSION_MSG = '文件無讀寫權限，請檢查權限設置'
-    EC_NOT_FOUND_MSG = '該 DSDT 中找不到 EC 設備，是否為台式機？'
-    OR_NOT_FOUND_MSG = '該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？'
+    FILE_NOT_FOUND_MSG = '\033[1;31m未找到該文件，請檢查文件名拼寫\033[0m'
+    PERMISSION_MSG = '\033[1;31m文件無讀寫權限，請檢查權限設置\033[0m'
+    EC_NOT_FOUND_MSG = '\033[1;31m該 DSDT 中找不到 EC 設備\033[0m'
+    OR_NOT_FOUND_MSG = '\033[1;31m該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？\033[0m'
 
 else:
     # Fall back to English
@@ -64,7 +64,7 @@ Usage:
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
-    FILE_NOT_FOUND_MSG = 'File not found, please re-check file name.'
-    PERMISSION_MSG = 'File no R/W permission'
-    EC_NOT_FOUND_MSG = 'Cannot found EC device in this DSDT, is it from a desktop computer?'
-    OR_NOT_FOUND_MSG = 'Cannot found any OperationRegion from EC device, is it from a desktop computer?'
+    FILE_NOT_FOUND_MSG = '\033[1;31mFile not found, please re-check file name.\033[0m'
+    PERMISSION_MSG = '\033[1;31mFile no R/W permission\033[0m'
+    EC_NOT_FOUND_MSG = '\033[1;31mCannot found EC device in this DSDT.\033[0m'
+    OR_NOT_FOUND_MSG = '\033[1;31mCannot found any OperationRegion from EC device, is it from a desktop computer?\033[0m'
