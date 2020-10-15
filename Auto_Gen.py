@@ -235,6 +235,7 @@ class AutoGen:
                         if "}" in word:
                             bracket_stack.pop()
                             if len(bracket_stack) == 0:
+                                content += word
                                 break
                         content += (word+' ')
                 trigger = False
@@ -434,9 +435,80 @@ class AutoGen:
             print()
 
     def find_field(self):
+        self._16bit = []
+        self._32bit = []
+        self._larger_bit = []
+        self.field_generated = ''
         for OR_info in self.OR_info:
             content = self.get_content(OR_info["Path"]+'.'+OR_info["Name"])
-            print(content)
+            count = content.count("{")
+            splited = content.split("}")
+            for field in splited[:-1]:
+                tmp = field.split('{')
+                field_info = tmp[0]
+                field_content = tmp[1].split('\n')
+                generated = "OperationRegion (%s, %s, %s, %s)\n" % (
+                    OR_info["Name"], OR_info["Storage"], OR_info["Offset"], OR_info["Length"])
+                generated += field_info.strip() + '\n{'
+                offset_bit = 0  # Offset in bits
+                name = ''
+                size = 0
+                for item in field_content:
+                    if ',' not in item:
+                        # Skip empty line
+                        continue
+                    elif "Offset" not in item:
+                        a = item.split(',')
+                        name = a[0].strip()
+                        size = int(a[1].strip())
+                        if size == 16 and name != '':
+                            # 16 bit FieldUnit
+                            name0 = name1 = ''
+                            for i in range(0, 4):
+                                if content.find(name[:-1]+str(2*i)) == -1:
+                                    name0 = name[:-1]+str(2*i)
+                                    if content.find(name[:-1]+str(2*i+1)) == -1:
+                                        name1 = name[:-1]+str(2*i+1)
+                                        break
+                            self._16bit.append(
+                                {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1})
+                            generated += ('\n    ' + name0 +
+                                          ', 8, ' + name1 + ', 8,')
+                        elif size == 32 and name != '':
+                            # 32 bit FieldUnit
+                            name0 = name1 = name2 = name3 = ''
+                            for i in range(0, 1):
+                                if content.find(name[:-1]+str(4*i)) == -1:
+                                    name0 = name[:-1]+str(4*i)
+                                    if content.find(name[:-1]+str(4*i+1)) == -1:
+                                        name1 = name[:-1]+str(4*i+1)
+                                        if content.find(name[:-1]+str(4*i+2)) == -1:
+                                            name2 = name[:-1]+str(4*i+2)
+                                            if content.find(name[:-1]+str(4*i+3)) == -1:
+                                                name3 = name[:-1]+str(4*i+3)
+                                                break
+                            self._32bit.append(
+                                {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1, "name2": name2, "name3": name3})
+                            generated += ('\n    ' + name0 + ', 8,' + name1 +
+                                          ', 8, ' + name2 + ', 8, ' + name3 + ', 8,')
+                        elif size > 32 and name != '':
+                            # Larger bit FieldUnit
+                            self._larger_bit.append(
+                                {"name": name, "offset": int(offset_bit/8), "size": size})
+                            generated += '\n    , %d,' % size
+                        else:
+                            generated += '\n    , %d,' % size
+                        offset_bit += size
+                    else:
+                        item = item.strip()
+                        generated += ('\n    '+item)
+                        offset = re.search(r'Offset \((.*)\)', item).group(1)
+                        offset_bit = int(offset, 16) * 8
+                # print(field_content)
+                generated += '\n}\n'
+                # print(generated)
+                self.field_generated += generated
+            print(self.field_generated)
 
 
 if __name__ == '__main__':
