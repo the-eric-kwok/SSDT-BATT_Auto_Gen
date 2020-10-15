@@ -521,8 +521,7 @@ class AutoGen:
                         size = int(a[1].strip())
                         if size == 16 and name != '':
                             # 16 bit FieldUnit
-                            name0, name1 = self.field_unit_naming(
-                                name, 16, content)
+                            name0, name1 = self.field_unit_naming(name, 16)
                             self._16bit.append(
                                 {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1})
                             generated += ('\n    ' + name0 +
@@ -530,7 +529,7 @@ class AutoGen:
                         elif size == 32 and name != '':
                             # 32 bit FieldUnit
                             name0, name1, name2, name3 = self.field_unit_naming(
-                                name, 32, content)
+                                name, 32)
                             self._32bit.append(
                                 {"name": name, "offset": int(offset_bit/8), "name0": name0, "name1": name1, "name2": name2, "name3": name3})
                             generated += ('\n    ' + name0 + ', 8,' + name1 +
