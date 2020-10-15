@@ -11,7 +11,6 @@ from multilanguage import *
 
 class AutoGen:
     OR_info = []
-    EC_path = []
     verbose = False
     debug = False
     head = """DefinitionBlock ("", "SSDT", 2, "ERIC", "BATT", 0x00000000)
@@ -21,10 +20,10 @@ class AutoGen:
     def __init__(self) -> None:
         self.parse_args()
         self.clean_out()
-        self.find_EC_path()
-        self.find_EC_content()
+        self.EC_content = self.get_content("PNP0C09")
         self.find_OperationRegion()
         self.find_field()
+        self.patch_method()
 
     def show_help(self):
         print(HELP_MESSAGE)
@@ -73,13 +72,19 @@ class AutoGen:
         # 去除空行
         self.file_content = re.sub(r'^\n', "", self.file_content)
 
-    def get_content(self, target):
+    def get_content(self, target: str):
         '''
         Getting file content about given target.
 
-        @param: target(str) - which device/field/method are you finding
+        If target is a path, return its content in string. 
 
-        @return: str - file content about that device/field/method
+        If target is a word, return the method which includes it in a dict. 
+
+        @param: target(str) - device/field/method absolute path or query word (determine by ' \ ')
+
+        @return: content(str) - file content about that device/field/method
+
+        @return: content(dict) - {"path": "content"}
         '''
         if self.debug:
             print('\n\n')
@@ -88,28 +93,57 @@ class AutoGen:
         stack = []
         trigger = False
         content = ''
+        path_list = []  # Find path by word
+
         for i in range(0, len(dsdt_splited)):
             word = dsdt_splited[i]
+            if '\\' not in target:
+                if target in dsdt_splited[i]:
+                    path = ''
+                    for item in stack:
+                        if item:
+                            if item[0] == 'Scope':
+                                if item[1].startswith('\\'):
+                                    path = item[1]
+                                else:
+                                    path = '\\' + item[1]
+                            elif item[0] == 'Device':
+                                if stack.index(item) != 1:
+                                    path += '.'
+                                else:
+                                    path = '\\'
+                                path += item[1]
+                            elif item[0] == 'Method':
+                                if stack.index(item) != 1:
+                                    path += '.'
+                                else:
+                                    path = '\\'
+                                path += item[1]
+                            elif item[0] == "Field":
+                                # avoid searching Field
+                                path = None
+                    if path:
+                        path_list.append(path)
             if dsdt_splited[i] == "DefinitionBlock":
                 stack.append("DefinitionBlock")
             elif dsdt_splited[i] == "Field":
                 try:
                     name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                    trigger = True
+                    trigger = True  # 触发检查当前路径
                 except IndexError:
                     continue
                 stack.append(("Field", name))
             elif dsdt_splited[i] == "IndexField":
                 try:
                     name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                    trigger = True
+                    trigger = True  # 触发检查当前路径
                 except IndexError:
                     continue
                 stack.append(("IndexField", name))
             elif dsdt_splited[i] == "Scope":
                 try:
                     path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                    trigger = True
+                    trigger = True  # 触发检查当前路径
                 except IndexError:
                     continue
                 stack.append(("Scope", path))
@@ -118,7 +152,7 @@ class AutoGen:
             elif dsdt_splited[i] == "Method":
                 try:
                     name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                    trigger = True
+                    trigger = True  # 触发检查当前路径
                 except IndexError:
                     continue
                 stack.append(("Method", name))
@@ -129,7 +163,7 @@ class AutoGen:
             elif dsdt_splited[i] == "Device":
                 try:
                     name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                    trigger = True
+                    trigger = True  # 触发检查当前路径
                 except IndexError:
                     continue
                 stack.append(("Device", name))
@@ -140,7 +174,7 @@ class AutoGen:
             elif dsdt_splited[i] == "ThermalZone":
                 try:
                     name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                    trigger = True
+                    trigger = True  # 触发检查当前路径
                 except IndexError:
                     continue
                 stack.append(("ThermalZone", name))
@@ -242,174 +276,12 @@ class AutoGen:
                                 break
                         content += (word+' ')
                 trigger = False
+        if len(path_list) > 0:
+            # 关键词搜索模式时
+            content = {}
+            for path in path_list:
+                content[path] = self.get_content(path)
         return content
-
-    def find_EC_path(self):
-        '''
-        Find all "PNP0C09" device in DSDT and return its path as a list.
-
-        @return: list - including all "PNP0C09" device path
-        '''
-        if self.debug:
-            print('\n\n')
-            print("---------------------find EC path-----------------------")
-
-        stack = []
-        EC_found = False
-        dsdt_splited = self.file_content.split()
-        # for i in range(0, 5000):
-        #    print(dsdt_splited[i])
-        for i in range(0, len(dsdt_splited)):
-            word = dsdt_splited[i]
-            if "PNP0C09" in dsdt_splited[i]:
-                EC_found = True
-                path = ""
-                for item in stack:
-                    if item:
-                        if item[0] == 'Scope':
-                            if item[1].startswith('\\'):
-                                path = item[1]
-                            else:
-                                path = '\\' + item[1]
-                        elif item[0] == 'Device':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'Method':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'Field':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'IndexField':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'ThermalZone':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                if self.verbose:
-                    print("EC Path:", path)
-                self.EC_path.append(path)
-            elif dsdt_splited[i] == "DefinitionBlock":
-                stack.append("DefinitionBlock")
-            elif dsdt_splited[i] == "Field":
-                try:
-                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                except IndexError:
-                    continue
-                stack.append(("Field", name))
-            elif dsdt_splited[i] == "IndexField":
-                try:
-                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                except IndexError:
-                    continue
-                stack.append(("IndexField", name))
-            elif dsdt_splited[i] == "Scope":
-                try:
-                    path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                except IndexError:
-                    continue
-                stack.append(("Scope", path))
-                if self.debug:
-                    print("Scope", path)
-            elif dsdt_splited[i] == "Method":
-                try:
-                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                except IndexError:
-                    continue
-                stack.append(("Method", name))
-                if self.debug:
-                    print("Method", name)
-                    if name == "_CRS":
-                        print()
-            elif dsdt_splited[i] == "Device":
-                try:
-                    name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                except IndexError:
-                    continue
-                stack.append(("Device", name))
-                if self.debug:
-                    print("Device", name)
-                    if name == "LNKB":
-                        print()
-            elif dsdt_splited[i] == "ThermalZone":
-                try:
-                    name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                except IndexError:
-                    continue
-                stack.append(("ThermalZone", name))
-
-            elif dsdt_splited[i] in ("If", "(If"):
-                stack.append(None)
-            elif dsdt_splited[i] == "Else":
-                stack.append(None)
-            elif dsdt_splited[i] == "ElseIf":
-                stack.append(None)
-            elif dsdt_splited[i] == "Switch":
-                stack.append(None)
-            elif dsdt_splited[i] == "Case":
-                stack.append(None)
-            elif dsdt_splited[i] == "Default":
-                stack.append(None)
-            elif dsdt_splited[i] == "While":
-                stack.append(None)
-            elif dsdt_splited[i] in ("Buffer", "(Buffer"):
-                stack.append(None)
-            elif dsdt_splited[i] in ("Package", "(Package"):
-                stack.append(None)
-            elif dsdt_splited[i] == "IRQ":
-                stack.append(None)
-            elif dsdt_splited[i] == "IRQNoFlags":
-                stack.append(None)
-            elif dsdt_splited[i] in ("ResourceTemplate", "(ResourceTemplate"):
-                stack.append(None)
-            elif dsdt_splited[i] == "Interrupt":
-                stack.append(None)
-            elif dsdt_splited[i] == "GpioInt":
-                stack.append(None)
-            elif dsdt_splited[i] == "GpioIo":
-                stack.append(None)
-            elif dsdt_splited[i] == "StartDependentFn":
-                stack.append(None)
-            elif dsdt_splited[i] == "StartDependentFnNoPri":
-                stack.append(None)
-            elif dsdt_splited[i] == "Processor":
-                stack.append(None)
-            elif dsdt_splited[i] == "PowerResource":
-                stack.append(None)
-            elif dsdt_splited[i] in ("DMA", "(DMA"):
-                stack.append(None)
-
-            elif "}" in dsdt_splited[i]:
-                stack.pop()
-        if not EC_found:
-            print(EC_NOT_FOUND_MSG)
-            exit(1)
-
-    def find_EC_content(self):
-        '''
-        Find EmbeddedController part content in dsl and return it as a dictionary
-
-        @return: dict - { path : file content }
-        '''
-        content = {}
-        for item in self.EC_path:
-            content[item] = self.get_content(item)
-        self.EC_content = content
 
     def find_OperationRegion(self):
         '''
@@ -571,8 +443,20 @@ class AutoGen:
         print(self.file_generated)
 
     def patch_method(self):
+        self.method_to_patch = {}
         for unit in self.modified_fieldunit:
-            pass
+            result = self.get_content(unit["name"])
+            for EC_dev in self.EC_content:
+                # 确定 EC 路径
+                if EC_dev in unit["OR path"]:
+                    break
+            for name in result:
+                if name in self.method_to_patch or EC_dev not in name:
+                    # 去重，去除非EC域
+                    continue
+                print("Scope (%s)\n{\n" % '.'.join(name.split('.')[:-1]))
+                print(result[name])
+                self.method_to_patch[name] = (result[name])
 
 
 if __name__ == '__main__':

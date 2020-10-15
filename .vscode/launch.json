@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "",
-                "Sample/DSDT_Dell-Inspiron-5584.dsl"
+                "Sample/DSDT_y700-isk.dsl"
             ]
         }
     ]
