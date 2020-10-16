@@ -7,6 +7,7 @@ import os
 import re
 from types import TracebackType, new_class
 from multilanguage import *
+import time
 
 
 class AutoGen:
@@ -454,10 +455,14 @@ class AutoGen:
                 if name in self.method_to_patch or EC_dev not in name:
                     # 去重，去除非EC域
                     continue
-                print("Scope (%s)\n{\n" % '.'.join(name.split('.')[:-1]))
+                result[name] = "    Scope (%s)\n    {\n        " % '.'.join(
+                    name.split('.')[:-1]) + result[name] + "    }"
                 print(result[name])
                 self.method_to_patch[name] = (result[name])
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     app = AutoGen()
+    end_time = time.time()
+    print("程序执行了", end_time-start_time, "秒")
