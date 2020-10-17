@@ -497,19 +497,36 @@ class AutoGen:
                         self.method_to_patch[method])
         
 
-            if self.verbose:
-                print(self.method_to_patch[method])
+            #if self.verbose:
+            #    print(self.method_to_patch[method])
 
     def insert_osi(self):
         for method in self.method_to_patch:
             stack = []
+            method_info = re.search('Method \(%s, (\d+), (NotSerialized|Serialized)\)' % method[-4:], 
+                self.method_to_patch[method]).groups()
             splited = self.method_to_patch[method].split(' ')
             for word in splited:
                 if "{" in word:
                     stack.append('{')
                 elif "}" in word:
                     stack.pop()
-                pass
+                    if len(stack) == 1:
+                        index = splited.index(word)
+                        arg = ''
+                        for i in range(0, int(method_info[0])):
+                            arg += 'Arg%d' % i
+                        splited.insert(index+1, 
+                            "}\n        Else\n        {\n            X%s(%s)\n        }\n" % (
+                            method[-3:], arg))
+                        break
+            self.method_to_patch[method] = ' '.join(splited)
+            re.sub('Method \(%s, \d+, N?o?t?Serialized\)[\s\S\n]*?{', 
+                "Method (%s, %s, %s)\n        {\n            If (_OSI(\"Darwin\")\n            {"%(
+                method[-4:], method_info[0], method_info[1]), 
+                self.method_to_patch[method]) # 未能正常工作，无法添加if osi
+            print(self.method_to_patch[method])
+
 
 if __name__ == '__main__':
     start_time = time.time()
