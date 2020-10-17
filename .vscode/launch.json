@@ -11,8 +11,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "",
-                "Sample/DSDT_y700-isk.dsl"
+                "-v",
+                "Sample/DSDT_Alianware-17R5.dsl"
             ]
         }
     ]

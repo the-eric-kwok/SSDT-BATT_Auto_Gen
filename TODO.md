@@ -6,7 +6,7 @@
     [{
         "offset": 0
         "name": "",
-        "size": "",
+        "size": 0,
         "read method": "",
         "write method": "",
         "OR path": ""
@@ -18,3 +18,4 @@
 - [ ] 将原变量名使用 `self.modified_unit["read method"]` 指定的方法进行读取或写入
 - [x] 删除写入Field相关的内容（因为不需要进行变量拆分）
 - [ ] Mutex 置零补丁生成
+- [ ] 重命名补丁生成

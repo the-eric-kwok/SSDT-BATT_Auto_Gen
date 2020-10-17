@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from os import devnull, rename
 import sys
 import os
 import re
-from types import TracebackType, new_class
 from multilanguage import *
+import time
 
 
 class AutoGen:
@@ -20,10 +19,11 @@ class AutoGen:
     def __init__(self) -> None:
         self.parse_args()
         self.clean_out()
-        self.EC_content = self.get_content("PNP0C09")
+        self.EC_content = self.get_content("\"PNP0C09\"")
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
+        self.insert_osi()
 
     def show_help(self):
         print(HELP_MESSAGE)
@@ -99,6 +99,10 @@ class AutoGen:
             word = dsdt_splited[i]
             if '\\' not in target:
                 if target in dsdt_splited[i]:
+                    word = dsdt_splited[i]
+                    if target != dsdt_splited[i] and not re.match('\\(*"?%s,?"?\\)*$' % target, dsdt_splited[i]) and not re.match('.*\\.%s' % target, dsdt_splited[i]):
+                        # 跳过非该变量名结尾的情况
+                        continue
                     path = ''
                     for item in stack:
                         if item:
@@ -445,19 +449,69 @@ class AutoGen:
     def patch_method(self):
         self.method_to_patch = {}
         for unit in self.modified_fieldunit:
+            if self.verbose:
+                print("Unit:", unit)
             result = self.get_content(unit["name"])
-            for EC_dev in self.EC_content:
-                # 确定 EC 路径
-                if EC_dev in unit["OR path"]:
-                    break
             for name in result:
-                if name in self.method_to_patch or EC_dev not in name:
-                    # 去重，去除非EC域
+                if name in self.method_to_patch or ("EC" not in name and "EC" not in result[name]):
+                    # 去重, 去除非 EC 域同名变量的影响
                     continue
-                print("Scope (%s)\n{\n" % '.'.join(name.split('.')[:-1]))
-                print(result[name])
+                result[name] = "    Scope (%s)\n    {\n        " % '.'.join(
+                    name.split('.')[:-1]) + result[name] + "\n    }"
+                #print(result[name])
                 self.method_to_patch[name] = (result[name])
+        for method in self.method_to_patch:
+            for unit in self.modified_fieldunit:
+                # 替换写入 UNIT = xxxx
+                reserve = re.findall("%s = (\\w+)" % unit['name'], self.method_to_patch[method])
+                for item in reserve:
+                    self.method_to_patch[method] = re.sub("%s = %s" % (unit['name'], item), 
+                        "%s (0x%X, %s, %s)" % (
+                            unit["write method"], int(unit["offset"]), unit["size"], item
+                        ), self.method_to_patch[method])
 
+                # 替换写入 Store (xxxx, UNIT)
+                reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
+                    self.method_to_patch[method])
+                for item in reserve:
+                    self.method_to_patch[method] = re.sub(
+                        "Store \\(%s, %s\\)" % (item, unit['name']), 
+                        "%s (0x%X, %s, %s)" % (unit["write method"], 
+                        int(unit["offset"]), unit["size"], item), 
+                        self.method_to_patch[method])
+
+                # 替换读取
+                reserve = re.findall("([^/])%s(\\W|\n)" % unit['name'], 
+                    self.method_to_patch[method])
+                for i in range(0, len(reserve)):
+                    item = list(reserve[i])
+                    for j in range(0, len(item)):
+                        if '(' in item[j]:
+                            item[j] = item[j].replace('(', r'\(')
+                        elif ')' in item[j]:
+                            item[j] = item[j].replace(')', r'\)')
+                    self.method_to_patch[method] = re.sub("%s%s%s" % (
+                        item[0], unit['name'], item[1]), 
+                        '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
+                        int(unit['offset']), unit['size'], reserve[i][1]), 
+                        self.method_to_patch[method])
+        
+
+            if self.verbose:
+                print(self.method_to_patch[method])
+
+    def insert_osi(self):
+        for method in self.method_to_patch:
+            stack = []
+            splited = self.method_to_patch[method].split(' ')
+            for word in splited:
+                if "{" in word:
+                    stack.append('{')
+                elif "}" in word:
+                    stack.pop()
+                pass
 
 if __name__ == '__main__':
+    start_time = time.time()
     app = AutoGen()
+    print("程序执行用时", time.time() - start_time, "秒")
