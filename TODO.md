@@ -13,7 +13,7 @@
     }]
     ```
     size 单位保持 bit 不变
-- [ ] 改造 get_content() 方法，使之能针对某一关键字搜索对应的 Method
+- [x] 改造 get_content() 方法，使之能针对某一关键字搜索对应的 Method
 - [ ] 搜索全文，记录需要修改的方法的路径及其内容
 - [ ] 将原变量名使用 `self.modified_unit["read method"]` 指定的方法进行读取或写入
 - [x] 删除写入Field相关的内容（因为不需要进行变量拆分）

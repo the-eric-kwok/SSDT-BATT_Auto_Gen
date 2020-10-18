@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from os import devnull, rename
 import sys
 import os
 import re
-from types import TracebackType, new_class
 from multilanguage import *
 import time
 

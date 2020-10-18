@@ -1,1 +1,1 @@
-find Sample -name "*.dsl" -type f -print -exec ./Auto_Gen.py {} \;
+find Sample -name "*.dsl" -type f -print -exec pypy3 Auto_Gen.py {} \;

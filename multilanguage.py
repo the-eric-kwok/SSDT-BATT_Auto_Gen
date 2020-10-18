@@ -28,8 +28,15 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
 鸣谢 Rehabman 为 macOS 编译了 iasl 编译器。
 鸣谢 DalianSky、XStar-Dev、神楽小白提供了简单易懂的黑苹果电池热补丁教程。
 
+\033[4m推荐使用 pypy3 以获得更好的性能\033[0m
+
 用法: 
     python3 Auto_Gen.py <DSDT.dsl>
+
+或
+
+    pypy3 Auto_Gen.py <DSDT.dsl>
+
 
 '''
     NOT_NEED_TO_PATCH = '\033[1;36m该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！\033[0m\n'

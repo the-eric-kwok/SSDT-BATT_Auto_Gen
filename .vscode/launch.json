@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "",
-                "Sample/DSDT_y700-isk.dsl"
+                "Sample/DSDT_HP-840-G2.dsl"
             ]
         }
     ]
