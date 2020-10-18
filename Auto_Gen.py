@@ -517,7 +517,7 @@ class AutoGen:
                         int(unit['offset']), unit['size'], reserve[i][1]), 
                         self.method_to_patch[method])
 
-            # Drop untouched method
+            # TODO Drop untouched method
             '''
             modified = False
             for unit in self.modified_fieldunit:
