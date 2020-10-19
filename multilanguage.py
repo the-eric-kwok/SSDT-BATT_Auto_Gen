@@ -8,7 +8,15 @@ Credit: Rehabman for iasl compiler, DalianSky, XStar-Dev, 神楽小白
 for simple-to-follow battery hotpatching guide.
 
 Usage:
-    python3 Auto_Gen.py <DSDT.dsl>
+    python3 Auto_Gen.py [options] <DSDT.dsl>
+
+Or:
+    pypy3 Auto_Gen.py [options] <DSDT.dsl>
+
+Options:
+    -v        Verbose mode
+    -debug    Debug mode, this will generate tons of data on you screen
+    -h        Show this help message
 
 '''
 FILE_NOT_FOUND_ERR = '\033[1;31mFile not found, please re-check file name.\033[0m'
@@ -23,6 +31,7 @@ NOT_NEED_TO_PATCH_MSG = '\033[1;36mThis DSDT does not need to be patched! Drop S
 IS_THIS_HP_LAPTOP = '\033[1;36mI see ACEL device in this DSDT, is this HP laptop? (yes/no)\033[0m'
 COMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully compiled! Please check ./Product folder.\033[0m'
 TRY_TO_COMPILE_ANYWAY = '\033[1;36miasl compiler not found in working directory, trying to compile anyway.\nIf you didn\'t found .aml file under ./Product folder, you should compile the .dsl file using -f (force) option\033[0m'
+DANGEROUS_PATCH_MSG = ['\033[1;31mThis patch includes dangerous binary patch: ', '->', ' You should review it before apply!!\n(Use Hex Fiend to extend the heximal code, make sure it\'s unique in whole DSDT.aml)\033[0m']
 
 LANG = os.environ.get('LANG').split('.')[0]
 if LANG == "zh_CN":
@@ -36,23 +45,31 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
 \033[4m推荐使用 pypy3 以获得更好的性能\033[0m
 
 用法: 
-    python3 Auto_Gen.py <DSDT.dsl>
+    python3 Auto_Gen.py [options] <DSDT.dsl>
 
 或
 
-    pypy3 Auto_Gen.py <DSDT.dsl>
+    pypy3 Auto_Gen.py [options] <DSDT.dsl>
 
+Options:
+    -v        啰嗦模式
+    -debug    调试模式，此选项会在您的屏幕上输出大量信息
+    -h        显示此帮助信息
 
 '''
-    NOT_NEED_TO_PATCH_MSG = '\033[1;36m该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！\033[0m'
     FILE_NOT_FOUND_ERR = '\033[1;31m未找到该文件，请检查文件名拼写\033[0m'
     PERMISSION_ERR = '\033[1;31m文件无读写权限，请检查权限设置\033[0m'
     EC_NOT_FOUND_ERR = '\033[1;31m该 DSDT 中找不到 EC 设备\033[0m'
     OR_NOT_FOUND_ERR = '\033[1;31m该 DSDT 的 EC 设备中没有任何的 OperationRegion，是否为台式机？\033[0m'
     FIELD_UNIT_OFFSET_ERR = '\033[1;31m此DSDT中某些要处理的FieldUnit偏移量不能被8整除，看起来你的DSDT被不正确地修改过，请重新导出DSDT\033[0m'
+    TOO_MANY_BATT_ERR = "\033[1;31m此文件中有多个电池设备！双电池补丁目前还不被支持\033[0m"
+    TOO_FEW_BATT_ERR = "\033[1;31m此文件中似乎没有电池设备！这是台式机吗？\033[0m"
     GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl补丁文件，该文件位于 ./Product 文件夹中\033[0m'
-    TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m"
-    TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m"
+    NOT_NEED_TO_PATCH_MSG = '\033[1;36m该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！\033[0m'
+    IS_THIS_HP_LAPTOP = '\033[1;36m我在此文件中看到了 ACEL 设备，这是一台惠普笔记本吗？ (yes/no)\033[0m'
+    COMPILE_SUCCESS_MSG = '\033[1;36m成功编译！请看看 ./Product 文件夹\033[0m'
+    TRY_TO_COMPILE_ANYWAY = '\033[1;36m我在当前目录下没找到 iasl 编译器，不过无论如何我还是尝试为您编译\n如果您没有在 ./Product 文件夹下看到 .aml 文件，您应该使用 -f (强制) 选项手动编译 dsl 文件\033[0m'
+    DANGEROUS_PATCH_MSG = ['\033[1;31m这个补丁包含了危险的二进制更名：', '->', ' 您应该自行制作此更名补丁\n（使用 Hex Fiend 工具延长十六进制片段，以确保其唯一性）\033[0m']
 
 elif "zh" in LANG:
     HELP_MESSAGE = '''
@@ -63,15 +80,27 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
 鳴謝 DalianSky、XStar-Dev、神楽小白提供了簡單易懂的黑蘋果電池熱補丁教程。
 
 用法：
-    python3 Auto_Gen.py <DSDT.dsl>
+    python3 Auto_Gen.py [options] <DSDT.dsl>
+
+或：
+    pypy3 Auto_Gen.py [options] <DSDT.dsl>
+
+Options:
+    -v        囉嗦模式
+    -debug    調試模式，此選項會在您的屏幕上輸出大量的信息
+    -h        顯示此幫助信息
 
 '''
-    NOT_NEED_TO_PATCH_MSG = '\033[1;36m該 DSDT 不需要打補丁即可正常顯示電量，放入 SMCBatteryManager.kext 即可！\033[0m'
     FILE_NOT_FOUND_ERR = '\033[1;31m未找到該文件，請檢查文件名拼寫\033[0m'
     PERMISSION_ERR = '\033[1;31m文件無讀寫權限，請檢查權限設置\033[0m'
     EC_NOT_FOUND_ERR = '\033[1;31m該 DSDT 中找不到 EC 設備\033[0m'
     OR_NOT_FOUND_ERR = '\033[1;31m該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？\033[0m'
     FIELD_UNIT_OFFSET_ERR = '\033[1;31m此DSDT中某些要處理的FieldUnit的偏移量不能被8整除，看起來你的DSDT被不正確地修改過，請重新導出DSDT\033[0m'
-    GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl 補丁文件，該文件位於 ./Product 文件夾中\033[0m'
     TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m"
     TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m"
+    NOT_NEED_TO_PATCH_MSG = '\033[1;36m該 DSDT 不需要打補丁即可正常顯示電量，放入 SMCBatteryManager.kext 即可！\033[0m'
+    GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl 補丁文件，該文件位於 ./Product 文件夾中\033[0m'
+    IS_THIS_HP_LAPTOP = '\033[1;36m我在此文件中看到了 ACEL 設備，這是一台惠普筆電嗎？？ (yes/no)\033[0m'
+    COMPILE_SUCCESS_MSG = '\033[1;36m成功編譯！請看看 ./Product 文件夾\033[0m'
+    TRY_TO_COMPILE_ANYWAY = '\033[1;36m我在當前目錄下沒看到 iasl 編譯器，不過無論如何我還是嘗試為您編譯\n如果您沒有在 ./Product 文件夾下看到 .aml 文件，您應該使用 -f (強制) 選項手動編譯 dsl 文件\033[0m'
+    DANGEROUS_PATCH_MSG = ['\033[1;31m這個補丁包含了危險的二進制更名：', '->', ' 您應該自行製作此更名補丁\n（使用 Hex Fiend 工具延長十六進制片段，以確保其唯一性）\033[0m']
