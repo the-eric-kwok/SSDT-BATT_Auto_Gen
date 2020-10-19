@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v",
-                "Sample/DSDT_Lenovo-W541.dsl"
+                "Sample/DSDT_HP-Pavillion-15.dsl"
             ]
         }
     ]

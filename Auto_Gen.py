@@ -460,6 +460,7 @@ class AutoGen:
 
     def patch_method(self):
         self.method_to_patch = {}
+        # Getting method content
         for unit in self.modified_fieldunit:
             if self.verbose:
                 print("Unit:", unit)
@@ -473,6 +474,8 @@ class AutoGen:
                 # Handle method like "Method (\WAK)"
                 result[name] = result[name].replace("Scope ()", "Scope (\)")
                 self.method_to_patch[name] = (result[name])
+
+        # Patching method
         for method in self.method_to_patch:
             if self.verbose:
                 print("""
@@ -481,6 +484,8 @@ class AutoGen:
 =============================
 """ % method)
             for unit in self.modified_fieldunit:
+                if unit['name'] == "BFCC":
+                    print("trigger")
                 if self.verbose:
                     print("Parsing", unit)
                 # Patch field writing, e.g. UNIT = xxxx
@@ -502,15 +507,22 @@ class AutoGen:
                         self.method_to_patch[method])
 
                 # Patch field reading
-                reserve = re.findall("^((?!Method).)*^((?!Device).)*^((?!Field).)*([^/])%s(\W|\n)" % unit['name'], 
-                    self.method_to_patch[method])  # stop patching method that have the same name as fieldunit
+                reserve = re.findall("(.*[^/])%s(\\W|\n)" % unit['name'], 
+                    self.method_to_patch[method])
                 for i in range(0, len(reserve)):
+                    if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
+                        continue  # stop patching method that have the same name as fieldunit
                     item = list(reserve[i])
                     for j in range(0, len(item)):
                         if '(' in item[j]:
-                            item[j] = item[j].replace('(', r'\(')
+                            count = item[j].count('(')
+                            item[j] = item[j].replace('(' * count, '\(' * count)
                         elif ')' in item[j]:
-                            item[j] = item[j].replace(')', r'\)')
+                            count = item[j].count(')')
+                            item[j] = item[j].replace(')' * count, '\)' * count)
+                        elif '^' in item[j]:
+                            count = item[j].count('^')
+                            item[j] = item[j].replace('^' * count, '\^' * count)
                     self.method_to_patch[method] = re.sub("%s%s%s" % (
                         item[0], unit['name'], item[1]), 
                         '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
@@ -552,6 +564,8 @@ class AutoGen:
                     if len(stack) == 2:
                         arg = ''
                         for i in range(0, int(method_info[1])):
+                            if i > 0:
+                                arg += ', '
                             arg += 'Arg%d' % i
                         # Insert return original method at the bottom
                         self.method_to_patch[method] = self.method_to_patch[method][:index] + \
