@@ -15,6 +15,7 @@ class AutoGen:
     head = """DefinitionBlock ("", "SSDT", 2, "ERIC", "BATT", 0x00000000)
 {"""
     RW_method = ""
+    comment = ""
 
     def __init__(self) -> None:
         self.parse_args()
@@ -26,6 +27,8 @@ class AutoGen:
         self.find_field()
         self.patch_method()
         self.insert_osi()
+        self.special_devices()
+        self.generate_comment()
         self.assemble()
         self.write_file()
 
@@ -517,6 +520,7 @@ class AutoGen:
                         continue
                 except KeyError:
                     if "EC" not in name and "EC" not in result[name]:
+                        # Remove fieldunit that not in EC scope
                         continue
                 if scope not in self.method_to_patch:
                     self.method_to_patch[scope] = {}
@@ -626,8 +630,87 @@ class AutoGen:
 
                 self.method_to_patch[scope][method] = '\n'.join(splited)
 
+    def patch_ACEL(self):
+        print("Patching ACEL...")
+        content = self.get_content("(ACEL)")
+        for dev in content:
+            if dev not in self.method_to_patch:
+                self.method_to_patch[dev] = {}
+            self.method_to_patch[dev]["%s._STA"%dev] = '''        Method (_STA, 0, NotSerialized) 
+        {
+            If (_OSI("Darwin")) 
+            {
+                Return (0)
+            }
+            Else 
+            {
+                Return(XSTA())        // May cause Windows keyboard stop after sleep
+            }
+        }
+'''
+
+    def special_devices(self):
+        '''
+        This method automatically patch some special laptops. For example, some HP laptop have ACEL device, 
+        which will cause battery info not able to be updated.
+        '''
+        if "Device (ACEL)" in self.dsdt_content:
+            if "HPQOEM" not in self.dsdt_content:
+                print(IS_THIS_HP_LAPTOP)
+                inp = input()
+                if inp == 'yes' or inp == 'y':
+                    self.patch_ACEL()
+            self.patch_ACEL()
+
+    def generate_comment(self):
+        # Find mutex and set them to zero
+        mutex = re.findall("Mutex \((.*?), (.*?)\)", self.dsdt_content)
+        for item in mutex:
+            name = item[0]
+            value = int(item[1], 16)
+            find = replace = '01'
+            if value != 0:
+                for c in name:
+                    asc = ord(c)
+                    find += "%02X" % asc
+                    replace += "%02X" % asc
+                find += "%02X" % value
+                replace += "00"
+                self.comment += '''// Set mutex %s to zero
+// Find:    %s
+// Replace: %s
+
+''' % (name, find, replace)
+
+        # generate ACPI patch
+        for scope in self.method_to_patch:
+            for method in self.method_to_patch[scope]:
+                if not self.method_to_patch[scope][method]:
+                    # Skip deleted method
+                    continue
+                method_info = list(re.search("Method \((.*?), (\d+?), (Serialized|NotSerialized)\)", 
+                    self.method_to_patch[scope][method]))
+                method_info[1] = method_info[1].replace("\\", "")
+                method_info[2] = int(method_info[2])
+                if method_info[3] == 'Serialized':
+                    method_info[2] += 8
+                find = replace = ''
+                for c in method_info[1]:
+                    asc = ord(c)
+                    find += "%02X" % asc
+                    replace += "%02X" % asc
+                replace = "58" + replace[2:]  # Set the 1st character to 'X'
+                find += "%02X" % method_info[2]
+                replace += "%02X" % method_info[2]
+                self.comment += '''// Rename %s to X%s
+// Find:    %s
+// Replace: %s
+
+''' % (method_info[1], method_info[1][1:], find, replace)
+
     def assemble(self):
-        self.file_generated = self.head + self.RW_method
+        self.file_generated = self.comment
+        self.file_generated += (self.head + self.RW_method)
         for scope in self.method_to_patch:
             have_method = False
             for method in self.method_to_patch[scope]:
@@ -646,10 +729,11 @@ class AutoGen:
         self.file_generated += '}\n'
 
     def write_file(self):
-        out_path = list(os.path.split(self.filepath))
-        out_path[0] += (os.sep + 'Product')
-        out_path[1] = out_path[1].replace("DSDT", "SSDT-BATT")
+        out_path = []
+        out_path.append(os.getcwd() + os.sep + 'Product')
+        out_path.append(self.filename.replace("DSDT", "SSDT-BATT"))
         out_path[1] = out_path[1].replace("dsdt", "SSDT-BATT")
+        out_path[1] = re.sub('.*/', '', out_path[1])
 
         if not os.path.exists(out_path[0]):
             # If directory not exists
@@ -667,9 +751,29 @@ class AutoGen:
                     with open(test, 'x') as f:
                         f.write(self.file_generated)
                         print(GENERATE_SUCCESSFUL_MSG)
-                    return
+                    break
                 except FileExistsError:
                     pass
+        
+        if os.path.exists('./iasl') and os.sys.platform == "darwin":
+            with os.popen("./iasl -f %s 2>&1" % out_path) as p:
+                ret = p.read()
+                if "AML Output" in ret:
+                    print(COMPILE_SUCCESS_MSG)
+                else:
+                    print(ret)
+        elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
+            with os.popen(".\\iasl.exe -f %s" % out_path) as p:
+                ret = p.read()
+                if "AML Output" in ret:
+                    print(COMPILE_SUCCESS_MSG)
+                else:
+                    print(ret)
+        else:
+            print(TRY_TO_COMPILE_ANYWAY)
+            os.system('iasl -f %s' % out_path)
+
+
 
 
 if __name__ == '__main__':

@@ -11,8 +11,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-debug",
-                "Sample/DSDT_y700-isk.dsl"
+                "-v",
+                "Sample/DSDT_Lenovo-W541.dsl"
             ]
         }
     ]

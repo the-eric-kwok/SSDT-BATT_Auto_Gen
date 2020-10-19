@@ -11,16 +11,18 @@ Usage:
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
-FILE_NOT_FOUND_ERR = '\033[1;31mFile not found, please re-check file name.\033[0m\n'
-PERMISSION_ERR = '\033[1;31mFile no R/W permission\033[0m\n'
-EC_NOT_FOUND_ERR = '\033[1;31mCannot found EC device in this DSDT.\033[0m\n'
-OR_NOT_FOUND_ERR = '\033[1;31mCannot found any OperationRegion from EC device. Is this desktop computer?\033[0m\n'
-FIELD_UNIT_OFFSET_ERR = "\033[1;31mSome Field Units that needed to be patch cannot be devided by 8 excaly. It seems like your DSDT is being modified uncorrectlly, please re-dump DSDT.\033[0m\n"
-TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m\n"
-TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m\n"
-
-GENERATE_SUCCESSFUL_MSG = "\033[1;36mSuccessfully generate SSDT-BATT.dsl patch under ./Product folder\033[0m\n"
-NOT_NEED_TO_PATCH_MSG = '\033[1;36mThis DSDT does not need to be patched! Drop SMCBatteryManager.kext and enjoy!\033[0m\n'
+FILE_NOT_FOUND_ERR = '\033[1;31mFile not found, please re-check file name.\033[0m'
+PERMISSION_ERR = '\033[1;31mFile no R/W permission\033[0m'
+EC_NOT_FOUND_ERR = '\033[1;31mCannot found EC device in this DSDT.\033[0m'
+OR_NOT_FOUND_ERR = '\033[1;31mCannot found any OperationRegion from EC device. Is this desktop computer?\033[0m'
+FIELD_UNIT_OFFSET_ERR = "\033[1;31mSome Field Units that needed to be patch cannot be devided by 8 excaly. It seems like your DSDT is being modified uncorrectlly, please re-dump DSDT.\033[0m"
+TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m"
+TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m"
+GENERATE_SUCCESSFUL_MSG = "\033[1;36mSuccessfully generate SSDT-BATT.dsl patch under ./Product folder\033[0m"
+NOT_NEED_TO_PATCH_MSG = '\033[1;36mThis DSDT does not need to be patched! Drop SMCBatteryManager.kext and enjoy!\033[0m'
+IS_THIS_HP_LAPTOP = '\033[1;36mI see ACEL device in this DSDT, is this HP laptop? (yes/no)\033[0m'
+COMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully compiled! Please check ./Product folder.\033[0m'
+TRY_TO_COMPILE_ANYWAY = '\033[1;36miasl compiler not found in working directory, trying to compile anyway.\nIf you didn\'t found .aml file under ./Product folder, you should compile the .dsl file using -f (force) option\033[0m'
 
 LANG = os.environ.get('LANG').split('.')[0]
 if LANG == "zh_CN":
@@ -42,15 +44,15 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
 
 
 '''
-    NOT_NEED_TO_PATCH_MSG = '\033[1;36m该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！\033[0m\n'
-    FILE_NOT_FOUND_ERR = '\033[1;31m未找到该文件，请检查文件名拼写\033[0m\n'
-    PERMISSION_ERR = '\033[1;31m文件无读写权限，请检查权限设置\033[0m\n'
-    EC_NOT_FOUND_ERR = '\033[1;31m该 DSDT 中找不到 EC 设备\033[0m\n'
-    OR_NOT_FOUND_ERR = '\033[1;31m该 DSDT 的 EC 设备中没有任何的 OperationRegion，是否为台式机？\033[0m\n'
-    FIELD_UNIT_OFFSET_ERR = '\033[1;31m此DSDT中某些要处理的FieldUnit偏移量不能被8整除，看起来你的DSDT被不正确地修改过，请重新导出DSDT\033[0m\n'
-    GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl补丁文件，该文件位于 ./Product 文件夹中\033[0m\n'
-    TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m\n"
-    TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m\n"
+    NOT_NEED_TO_PATCH_MSG = '\033[1;36m该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！\033[0m'
+    FILE_NOT_FOUND_ERR = '\033[1;31m未找到该文件，请检查文件名拼写\033[0m'
+    PERMISSION_ERR = '\033[1;31m文件无读写权限，请检查权限设置\033[0m'
+    EC_NOT_FOUND_ERR = '\033[1;31m该 DSDT 中找不到 EC 设备\033[0m'
+    OR_NOT_FOUND_ERR = '\033[1;31m该 DSDT 的 EC 设备中没有任何的 OperationRegion，是否为台式机？\033[0m'
+    FIELD_UNIT_OFFSET_ERR = '\033[1;31m此DSDT中某些要处理的FieldUnit偏移量不能被8整除，看起来你的DSDT被不正确地修改过，请重新导出DSDT\033[0m'
+    GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl补丁文件，该文件位于 ./Product 文件夹中\033[0m'
+    TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m"
+    TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m"
 
 elif "zh" in LANG:
     HELP_MESSAGE = '''
@@ -64,12 +66,12 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
     python3 Auto_Gen.py <DSDT.dsl>
 
 '''
-    NOT_NEED_TO_PATCH_MSG = '\033[1;36m該 DSDT 不需要打補丁即可正常顯示電量，放入 SMCBatteryManager.kext 即可！\033[0m\n'
-    FILE_NOT_FOUND_ERR = '\033[1;31m未找到該文件，請檢查文件名拼寫\033[0m\n'
-    PERMISSION_ERR = '\033[1;31m文件無讀寫權限，請檢查權限設置\033[0m\n'
-    EC_NOT_FOUND_ERR = '\033[1;31m該 DSDT 中找不到 EC 設備\033[0m\n'
-    OR_NOT_FOUND_ERR = '\033[1;31m該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？\033[0m\n'
-    FIELD_UNIT_OFFSET_ERR = '\033[1;31m此DSDT中某些要處理的FieldUnit的偏移量不能被8整除，看起來你的DSDT被不正確地修改過，請重新導出DSDT\033[0m\n'
-    GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl 補丁文件，該文件位於 ./Product 文件夾中\033[0m\n'
-    TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m\n"
-    TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m\n"
+    NOT_NEED_TO_PATCH_MSG = '\033[1;36m該 DSDT 不需要打補丁即可正常顯示電量，放入 SMCBatteryManager.kext 即可！\033[0m'
+    FILE_NOT_FOUND_ERR = '\033[1;31m未找到該文件，請檢查文件名拼寫\033[0m'
+    PERMISSION_ERR = '\033[1;31m文件無讀寫權限，請檢查權限設置\033[0m'
+    EC_NOT_FOUND_ERR = '\033[1;31m該 DSDT 中找不到 EC 設備\033[0m'
+    OR_NOT_FOUND_ERR = '\033[1;31m該 DSDT 的 EC 設備中沒有任何的 OperationRegion，是否為台式機？\033[0m'
+    FIELD_UNIT_OFFSET_ERR = '\033[1;31m此DSDT中某些要處理的FieldUnit的偏移量不能被8整除，看起來你的DSDT被不正確地修改過，請重新導出DSDT\033[0m'
+    GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl 補丁文件，該文件位於 ./Product 文件夾中\033[0m'
+    TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m"
+    TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m"
