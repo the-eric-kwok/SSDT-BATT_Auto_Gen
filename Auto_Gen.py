@@ -63,7 +63,38 @@ class AutoGen:
                 except PermissionError:
                     print(PERMISSION_ERR)
                     exit(1)
-
+            if '.aml' in arg:
+                if os.path.exists('./iasl') and os.sys.platform == "darwin":
+                    with os.popen("./iasl %s 2>&1" % arg) as p:
+                        ret = p.read()
+                        if "ASL Output" in ret:
+                            print(DECOMPILE_SUCCESS_MSG)
+                        else:
+                            print(ret)
+                            exit(1)
+                elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
+                    with os.popen(".\\iasl.exe %s" % arg) as p:
+                        ret = p.read()
+                        if "ASL Output" in ret:
+                            print(DECOMPILE_SUCCESS_MSG)
+                        else:
+                            print(ret)
+                            exit(1)
+                else:
+                    print(NO_IASL_COMPILER)
+                    exit(1)
+                self.filename = arg.replace('.aml', '.dsl')
+                self.filepath = os.path.abspath(arg)
+                try:
+                    with open(self.filename, 'r') as f:
+                        self.dsdt_content = f.read()
+                except FileNotFoundError:
+                    print(FILE_NOT_FOUND_ERR)
+                    exit(1)
+                except PermissionError:
+                    print(PERMISSION_ERR)
+                    exit(1)
+                    
     def out_handle(self):
         '''
         This tool cannot handle these cases.
