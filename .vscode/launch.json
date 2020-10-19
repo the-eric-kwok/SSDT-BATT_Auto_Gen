@@ -11,8 +11,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-v",
-                "Sample/DSDT_HP-Pavillion-15.dsl"
+                "-debug",
+                "Sample/DSDT_y700-isk.dsl"
             ]
         }
     ]

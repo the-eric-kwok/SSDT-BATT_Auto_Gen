@@ -78,7 +78,7 @@ class AutoGen:
         # Remove line comments
         self.dsdt_content = re.sub(r'//.*', '', self.dsdt_content)
         # Remove "External" declaration
-        self.dsdt_content = re.sub(r'External.*\n', "", self.dsdt_content)
+        self.dsdt_content = re.sub(r'External \(.*Obj\)\n', "", self.dsdt_content)
         # Remove "Firmware Error" that generated within disassambling
         self.dsdt_content = re.sub(
             r'Firmware Error.*\n', "", self.dsdt_content)
@@ -87,14 +87,14 @@ class AutoGen:
 
     def split_dsdt(self):
         self.dsdt_splited = self.dsdt_content.split(' ')
-        '''
-        length = len(self.dsdt_splited)
-        for i in range(0, length):
-            # remove spaces
-            i = length - i - 1
-            if self.dsdt_splited[i] == '':
-                del self.dsdt_splited[i]
-        '''
+        if self.debug:
+            length = len(self.dsdt_splited)
+            for i in range(0, length):
+                # remove spaces
+                i = length - i - 1
+                if self.dsdt_splited[i] == '':
+                    del self.dsdt_splited[i]
+        
 
     def get_content(self, target: str):
         '''
@@ -192,7 +192,7 @@ class AutoGen:
                 stack.append(("Method", name))
                 if self.debug:
                     print("Method", name)
-                    if name == "_Q8A":
+                    if name == "WQA0":
                         print()
             elif dsdt_splited[i] == "Device":
                 try:
@@ -203,7 +203,7 @@ class AutoGen:
                 stack.append(("Device", name))
                 if self.debug:
                     print("Device", name)
-                    if name == "PEG0":
+                    if name == "WMI1":
                         print()
             elif dsdt_splited[i] == "ThermalZone":
                 try:
@@ -505,125 +505,142 @@ class AutoGen:
                 print("Unit:", unit)
             result = self.get_content(unit["name"])
             for name in result:
-                if name in self.method_to_patch or ("EC" not in name and "EC" not in result[name]):
-                    # remove duplicates, and remove fieldunit that not in EC scoop
-                    continue
-                result[name] = "    Scope (%s)\n    {\n        " % '.'.join(
-                    name.split('.')[:-1]) + result[name] + "\n    }"
-                # Handle method like "Method (\WAK)"
-                result[name] = result[name].replace("Scope ()", "Scope (\)")
-                self.method_to_patch[name] = (result[name])
+                scope = '.'.join(name.split('.')[:-1])
+                if scope == "":
+                    # Handle method like "Method (\WAK)"
+                    scope = "\\"
+                try:
+                    if name in self.method_to_patch[scope] or ("EC" not in name and "EC" not in result[name]):
+                        # remove duplicates, and remove fieldunit that not in EC scope
+                        continue
+                except KeyError:
+                    pass
+                if scope not in self.method_to_patch:
+                    self.method_to_patch[scope] = {}
+                self.method_to_patch[scope][name] = result[name]
 
         # Patching method
-        for method in self.method_to_patch:
-            if self.verbose:
-                print("""
+        for scope in self.method_to_patch:
+            for method in self.method_to_patch[scope]:
+                if self.verbose:
+                    print("""
 =============================
 | Patching: %s |
 =============================
 """ % method)
-            for unit in self.modified_fieldunit:
-                if self.verbose:
-                    print("Parsing", unit)
-                # Patch field writing, e.g. UNIT = xxxx
-                reserve = re.findall("%s = (\\w+)" % unit['name'], self.method_to_patch[method])
-                for item in reserve:
-                    self.method_to_patch[method] = self.method_to_patch[method].replace(
-                        "%s = %s" % (unit['name'], item), 
-                        "%s (0x%X, %s, %s)" % (unit["write method"], 
-                            int(unit["offset"]), unit["size"], item)
-                    )
+                for unit in self.modified_fieldunit:
+                    if self.verbose:
+                        print("Parsing", unit)
+                    # Patch field writing, e.g. UNIT = xxxx
+                    reserve = re.findall("%s = (\\w+)" % unit['name'], self.method_to_patch[scope][method])
+                    for item in reserve:
+                        self.method_to_patch[scope][method] = self.method_to_patch[scope][method].replace(
+                            "%s = %s" % (unit['name'], item), 
+                            "%s (0x%X, %s, %s)" % (unit["write method"], 
+                                int(unit["offset"]), unit["size"], item)
+                        )
 
-                # Patch field writing, e.g. Store (xxxx, UNIT)
-                reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
-                    self.method_to_patch[method])
-                for item in reserve:
-                    self.method_to_patch[method] = self.method_to_patch[method].replace(
-                        "Store (%s, %s)" % (item, unit['name']),
-                        "%s (0x%X, %s, %s)" % (unit["write method"], 
-                            int(unit["offset"]), unit["size"], item)
-                    )
+                    # Patch field writing, e.g. Store (xxxx, UNIT)
+                    reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
+                        self.method_to_patch[scope][method])
+                    for item in reserve:
+                        self.method_to_patch[scope][method] = self.method_to_patch[scope][method].replace(
+                            "Store (%s, %s)" % (item, unit['name']),
+                            "%s (0x%X, %s, %s)" % (unit["write method"], 
+                                int(unit["offset"]), unit["size"], item)
+                        )
 
-                # Patch field reading
-                reserve = re.findall("(.*[^/])%s(\\W|\n)" % unit['name'], 
-                    self.method_to_patch[method])
-                for i in range(0, len(reserve)):
-                    if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
-                        continue  # stop patching method that have the same name as fieldunit
-                    self.method_to_patch[method] = self.method_to_patch[method].replace(
-                        reserve[i][0]+unit['name']+reserve[i][1], 
-                        '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
-                            int(unit['offset']), unit['size'], reserve[i][1]), 
-                    )
+                    # Patch field reading
+                    reserve = re.findall("(.*[^/])%s(\\W|\n)" % unit['name'], 
+                        self.method_to_patch[scope][method])
+                    for i in range(0, len(reserve)):
+                        if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
+                            continue  # stop patching method that have the same name as fieldunit
+                        self.method_to_patch[scope][method] = self.method_to_patch[scope][method].replace(
+                            reserve[i][0]+unit['name']+reserve[i][1], 
+                            '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
+                                int(unit['offset']), unit['size'], reserve[i][1]), 
+                        )
 
-            # TODO Drop untouched method
-            '''
-            modified = False
-            for unit in self.modified_fieldunit:
-                if unit['read method'] in self.method_to_patch[method] or unit['write method'] in self.method_to_patch[method]:
-                    modified = True
-            if not modified:
-                self.method_to_patch[method] = None
-            '''
+                modified = False
+                for unit in self.modified_fieldunit:
+                    if unit['read method'] in self.method_to_patch[scope][method] or unit['write method'] in self.method_to_patch[scope][method]:
+                        modified = True
+                if not modified:
+                    self.method_to_patch[scope][method] = None
+                
 
 
     def insert_osi(self):
-        for method in self.method_to_patch:
-            if method is None:
-                continue
-            stack = []
-            method_info = re.search(
-                'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
-                self.method_to_patch[method]).groups()
+        for scope in self.method_to_patch:
+            for method in self.method_to_patch[scope]:
+                if not self.method_to_patch[scope][method]:
+                    # Skip deleted method
+                    continue
+                stack = []
+                method_info = re.search(
+                    'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
+                    self.method_to_patch[scope][method]).groups()
 
-            # Insert if _OSI at the beginning
-            self.method_to_patch[method] = re.sub(
-                'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
-                "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
-                method_info[0], method_info[1], method_info[2]), 
-                self.method_to_patch[method])
+                # Insert if _OSI at the beginning
+                self.method_to_patch[scope][method] = re.sub(
+                    'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
+                    "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
+                    method_info[0], method_info[1], method_info[2]), 
+                    self.method_to_patch[scope][method])
 
-            for index in range(0, len(self.method_to_patch[method])):
-                if "{" in self.method_to_patch[method][index]:
-                    stack.append('{')
-                if "}" in self.method_to_patch[method][index]:
-                    stack.pop()
-                    if len(stack) == 2:
-                        arg = ''
-                        for i in range(0, int(method_info[1])):
-                            if i > 0:
-                                arg += ', '
-                            arg += 'Arg%d' % i
-                        # Insert return original method at the bottom
-                        self.method_to_patch[method] = self.method_to_patch[method][:index] + \
-                            "}\n        Else\n        {\n            Return(X%s(%s))\n        }\n" % (
-                            method_info[0][-3:], arg) + self.method_to_patch[method][index:]
-                        break
-            
+                for index in range(0, len(self.method_to_patch[scope][method])):
+                    if "{" in self.method_to_patch[scope][method][index]:
+                        stack.append('{')
+                    if "}" in self.method_to_patch[scope][method][index]:
+                        stack.pop()
+                        if len(stack) == 1:
+                            arg = ''
+                            for i in range(0, int(method_info[1])):
+                                if i > 0:
+                                    arg += ', '
+                                arg += 'Arg%d' % i
+                            # Insert return original method at the bottom
+                            self.method_to_patch[scope][method] = self.method_to_patch[scope][method][:index] + \
+                                "}\n        Else\n        {\n            Return(X%s(%s))\n        }\n" % (
+                                method_info[0][-3:], arg) + self.method_to_patch[scope][method][index:]
+                            break
 
-
-            stack = []
-            splited = self.method_to_patch[method].split('\n')
-            for index in range(0, len(splited)):
-                # Delete space at front of each line
-                splited[index] = splited[index].strip()
-                if '}' in splited[index]:
-                    stack.pop()
-                for i in range(0, len(stack)+1):
+                stack = []
+                splited = self.method_to_patch[scope][method].split('\n')
+                # Parse line by line
+                for index in range(0, len(splited)):
+                    # Delete space at front of each line
+                    splited[index] = splited[index].strip()
+                    if '}' in splited[index]:
+                        if '{' not in splited[index]:
+                            stack.pop()
                     # Indent by brackets
-                    splited[index] = "    " + splited[index]
-                if '{' in splited[index]:
-                    stack.append('{')
+                    splited[index] = "    " * (len(stack) + 2) + splited[index]
+                    if '{' in splited[index]:
+                        if '}' not in splited[index]:
+                            stack.append('{')
 
-            self.method_to_patch[method] = '\n'.join(splited)
+                self.method_to_patch[scope][method] = '\n'.join(splited)
 
     def assemble(self):
         self.file_generated = self.head + self.RW_method
-        for method in self.method_to_patch:
-            if method is None:
+        for scope in self.method_to_patch:
+            have_method = False
+            for method in self.method_to_patch[scope]:
+                if self.method_to_patch[scope][method]:
+                    have_method = True
+            if not have_method:
+                # Skip empty scope
                 continue
-            self.file_generated += self.method_to_patch[method] + '\n'
-        self.file_generated += '}'
+            self.file_generated += "    Scope (%s)\n    {\n" % scope
+            for method in self.method_to_patch[scope]:
+                if not self.method_to_patch[scope][method]:
+                    # Skip deleted method
+                    continue
+                self.file_generated += self.method_to_patch[scope][method] + '\n'
+            self.file_generated += "    }\n"
+        self.file_generated += '}\n'
 
     def write_file(self):
         out_path = list(os.path.split(self.filepath))
@@ -647,7 +664,7 @@ class AutoGen:
                     with open(test, 'x') as f:
                         f.write(self.file_generated)
                         print(GENERATE_SUCCESSFUL_MSG)
-                    exit(0)
+                    return
                 except FileExistsError:
                     pass
 
@@ -655,4 +672,5 @@ class AutoGen:
 if __name__ == '__main__':
     start_time = time.time()
     app = AutoGen()
-    print("程序执行用时", time.time() - start_time, "秒")
+    if app.verbose:
+        print("程序执行用时", time.time() - start_time, "秒")
