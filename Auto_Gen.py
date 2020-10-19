@@ -501,6 +501,8 @@ class AutoGen:
         self.method_to_patch = {}
         # Getting method content
         for unit in self.modified_fieldunit:
+            if unit['name'] == 'SMDA':
+                print("trigger")
             if self.verbose:
                 print("Unit:", unit)
             result = self.get_content(unit["name"])
@@ -514,7 +516,8 @@ class AutoGen:
                         # remove duplicates, and remove fieldunit that not in EC scope
                         continue
                 except KeyError:
-                    pass
+                    if "EC" not in name and "EC" not in result[name]:
+                        continue
                 if scope not in self.method_to_patch:
                     self.method_to_patch[scope] = {}
                 self.method_to_patch[scope][name] = result[name]
