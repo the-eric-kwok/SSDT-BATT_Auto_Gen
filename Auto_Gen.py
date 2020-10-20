@@ -742,28 +742,28 @@ class AutoGen:
                     # Skip deleted method
                     continue
                 method_info = list(re.search("Method \((.*?), (\d+?), (Serialized|NotSerialized)\)", 
-                    self.method_to_patch[scope][method]))
-                method_info[1] = method_info[1].replace("\\", "")
-                if method_info[1] in dangerous_patch_list:
+                    self.method_to_patch[scope][method]).groups())
+                method_info[0] = method_info[0].replace("\\", "")
+                if method_info[0] in dangerous_patch_list:
                     # Warning user if this tool patched some dangerous methods
-                    print(DANGEROUS_PATCH_MSG[0], method_info[1], DANGEROUS_PATCH_MSG[1],
-                        'X%s' % method_info[1][1:], DANGEROUS_PATCH_MSG[2])
-                method_info[2] = int(method_info[2])
-                if method_info[3] == 'Serialized':
-                    method_info[2] += 8
+                    print(DANGEROUS_PATCH_MSG[0], method_info[0], DANGEROUS_PATCH_MSG[1],
+                        'X%s' % method_info[0][1:], DANGEROUS_PATCH_MSG[2])
+                method_info[1] = int(method_info[1])
+                if method_info[2] == 'Serialized':
+                    method_info[1] += 8
                 find = replace = ''
-                for c in method_info[1]:
+                for c in method_info[0]:
                     asc = ord(c)
                     find += "%02X" % asc
                     replace += "%02X" % asc
                 replace = "58" + replace[2:]  # Set the 1st character to 'X'
-                find += "%02X" % method_info[2]
-                replace += "%02X" % method_info[2]
+                find += "%02X" % method_info[1]
+                replace += "%02X" % method_info[1]
                 self.comment += '''// Rename %s to X%s
 // Find:    %s
 // Replace: %s
 
-''' % (method_info[1], method_info[1][1:], find, replace)
+''' % (method_info[0], method_info[0][1:], find, replace)
 
     def assemble(self):
         '''
