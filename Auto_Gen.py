@@ -6,9 +6,12 @@ import os
 import re
 from multilanguage import *
 import time
+import get_content
 
 dangerous_patch_list = ['_PTS', '_WAK', '_STA', '_CRS', '_REG', '_ADR', '_PRW', '_DCS', '_DGS', '_DSS', '_INI', '_PS0', '_PS1',
     '_PS2', '_PS3', '_PS4', '_PS5', '_S0D', '_S1D', '_S2D', '_S3D', '_S4D', '_S5D']
+VERBOSE = False
+DEBUG = False
 
 class AutoGen:
     OR_info = []
@@ -19,12 +22,12 @@ class AutoGen:
     RW_method = ""
     comment = ""
 
-    def __init__(self) -> None:
-        self.parse_args()
-        self.out_handle()
+    def __init__(self, dsdt_content:str, filepath:str) -> None:
+        self.dsdt_content = dsdt_content
+        self.filepath = filepath
         self.clean_out()
         self.split_dsdt()
-        self.EC_content = self.get_content("\"PNP0C09\"")
+        self.EC_content = get_content.search(self.dsdt_content, '"PNP0C09"')
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
@@ -33,79 +36,6 @@ class AutoGen:
         self.generate_comment()
         self.assemble()
         self.write_file()
-
-    def show_help(self):
-        print(HELP_MESSAGE)
-
-    def parse_args(self):
-        arg_lens = len(sys.argv)
-        if arg_lens == 1:
-            self.show_help()
-            exit()
-        for arg in sys.argv:
-            if '-h' in arg or 'help' in arg:
-                self.show_help()
-                exit()
-            if '-v' in arg:
-                self.verbose = True
-            if '-debug' in arg:
-                self.verbose = True
-                self.debug = True
-            if '.dsl' in arg:
-                self.filename = arg
-                self.filepath = os.path.abspath(arg)
-                try:
-                    with open(self.filename, 'r') as f:
-                        self.dsdt_content = f.read()
-                except FileNotFoundError:
-                    print(FILE_NOT_FOUND_ERR)
-                    exit(1)
-                except PermissionError:
-                    print(PERMISSION_ERR)
-                    exit(1)
-            if '.aml' in arg:
-                if os.path.exists('./iasl') and os.sys.platform == "darwin":
-                    with os.popen("./iasl %s 2>&1" % arg) as p:
-                        ret = p.read()
-                        if "ASL Output" in ret:
-                            print(DECOMPILE_SUCCESS_MSG)
-                        else:
-                            print(ret)
-                            exit(1)
-                elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-                    with os.popen(".\\iasl.exe %s" % arg) as p:
-                        ret = p.read()
-                        if "ASL Output" in ret:
-                            print(DECOMPILE_SUCCESS_MSG)
-                        else:
-                            print(ret)
-                            exit(1)
-                else:
-                    print(NO_IASL_COMPILER)
-                    exit(1)
-                self.filename = arg.replace('.aml', '.dsl')
-                self.filepath = os.path.abspath(arg)
-                try:
-                    with open(self.filename, 'r') as f:
-                        self.dsdt_content = f.read()
-                except FileNotFoundError:
-                    print(FILE_NOT_FOUND_ERR)
-                    exit(1)
-                except PermissionError:
-                    print(PERMISSION_ERR)
-                    exit(1)
-                    
-    def out_handle(self):
-        '''
-        This tool cannot handle these cases.
-        '''
-        result = re.findall("PNP0C0A", self.dsdt_content)
-        if len(result) > 1:
-            print(TOO_MANY_BATT_ERR)
-            exit(1)
-        elif len(result) < 1:
-            print(TOO_FEW_BATT_ERR)
-            exit(1)
 
     def clean_out(self):
         '''
@@ -129,7 +59,7 @@ class AutoGen:
         Spliting dsdt content by space. Will not remove spaces if not in debug mode.
         '''
         self.dsdt_splited = self.dsdt_content.split(' ')
-        if self.debug:
+        if DEBUG:
             length = len(self.dsdt_splited)
             for i in range(0, length):
                 # remove spaces
@@ -137,252 +67,6 @@ class AutoGen:
                 if self.dsdt_splited[i] == '':
                     del self.dsdt_splited[i]
         
-
-    def get_content(self, target: str):
-        '''
-        Getting file content about given target.
-
-        If target is a path, return its content. 
-
-        If target is a word, return the method which includes it. 
-
-        @param: target(str) - device/field/method absolute path or query word (determine by ' \ ')
-
-        @return: content(str) - file content about that device/field/method
-
-        @return: content(dict) - {"path": "content"}
-        '''
-        if self.debug:
-            print('\n\n')
-            print("---------------------get content-----------------------")
-        dsdt_splited = self.dsdt_splited
-        stack = []
-        trigger = False
-        is_string = False
-        content = ''
-        path_list = []  # Find path by word
-
-        for i in range(0, len(dsdt_splited)):
-            word = dsdt_splited[i]
-            if '\\' not in target:
-                if target in dsdt_splited[i]:
-                    word = dsdt_splited[i]
-                    if target != dsdt_splited[i] and not re.match('\\(*"?%s,?"?\\)*$' % target, 
-                        dsdt_splited[i]) and not re.match('.*\\.%s' % target, dsdt_splited[i]):
-                        # 跳过非该变量名结尾的情况
-                        continue
-                    path = ''
-                    for item in stack:
-                        if item:
-                            if item[0] == 'Scope':
-                                if item[1].startswith('\\'):
-                                    path = item[1]
-                                else:
-                                    path = '\\' + item[1]
-                            elif item[0] == 'Device':
-                                if stack.index(item) != 1:
-                                    path += '.'
-                                else:
-                                    path = '\\'
-                                path += item[1]
-                            elif item[0] == 'Method':
-                                if stack.index(item) != 1:
-                                    path += '.'
-                                else:
-                                    path = '\\'
-                                path += item[1]
-                            elif item[0] == "Field":
-                                # avoid searching Field
-                                path = None
-                    if path:
-                        path_list.append(path)
-            if '"' in dsdt_splited[i]:
-                count = dsdt_splited[i].count('"')
-                for tmp in range(0, count):
-                    is_string = not is_string
-                continue
-            if dsdt_splited[i] == "DefinitionBlock":
-                stack.append("DefinitionBlock")
-
-            elif dsdt_splited[i] == "Field":
-                try:
-                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                    trigger = True  # 触发检查当前路径
-                except IndexError:
-                    continue
-                stack.append(("Field", name))
-
-            elif dsdt_splited[i] == "IndexField":
-                try:
-                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                    trigger = True  # 触发检查当前路径
-                except IndexError:
-                    continue
-                stack.append(("IndexField", name))
-
-            elif dsdt_splited[i] == "Scope":
-                try:
-                    path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                    trigger = True  # 触发检查当前路径
-                except IndexError:
-                    continue
-                stack.append(("Scope", path))
-                if self.debug:
-                    print("Scope", path)
-
-            elif dsdt_splited[i] == "Method":
-                try:
-                    name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                    trigger = True  # 触发检查当前路径
-                except IndexError:
-                    continue
-                stack.append(("Method", name))
-                if self.debug:
-                    print("Method", name)
-
-            elif dsdt_splited[i] == "Device":
-                try:
-                    name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                    trigger = True  # 触发检查当前路径
-                except IndexError:
-                    continue
-                stack.append(("Device", name))
-                if self.debug:
-                    print("Device", name)
-
-            elif dsdt_splited[i] == "ThermalZone":
-                try:
-                    name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                    trigger = True  # 触发检查当前路径
-                except IndexError:
-                    continue
-                stack.append(("ThermalZone", name))
-
-            elif dsdt_splited[i] in ("If", "(If"):
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "Else\n":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "ElseIf":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "Switch":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "Case":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "Default\n":
-                # don't remove that \n
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "While":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] in ("Buffer", "(Buffer"):
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] in ("Package", "(Package"):
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "IRQ":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "IRQNoFlags":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] in ("ResourceTemplate", "(ResourceTemplate"):
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "Interrupt":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "GpioInt":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "GpioIo":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "StartDependentFn":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "StartDependentFnNoPri":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "Processor":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] == "PowerResource":
-                if not is_string:
-                    stack.append(None)
-            elif dsdt_splited[i] in ("DMA", "(DMA"):
-                if not is_string:
-                    stack.append(None)
-
-            elif "}" in dsdt_splited[i]:
-                if not is_string:
-                    stack.pop()
-
-            if trigger:
-                # 触发检查当前路径
-                path = ''
-                for item in stack:
-                    if item:
-                        if item[0] == 'Scope':
-                            if item[1].startswith('\\'):
-                                path = item[1]
-                            else:
-                                path = '\\' + item[1]
-                        elif item[0] == 'Device':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'Method':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'Field':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'IndexField':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                        elif item[0] == 'ThermalZone':
-                            if stack.index(item) != 1:
-                                path += '.'
-                            else:
-                                path = '\\'
-                            path += item[1]
-                if path == target:
-                    # 匹配查找目标时
-                    bracket_stack = []
-                    for word in dsdt_splited[i:]:
-                        if "{" in word:
-                            bracket_stack.append('{')
-                        if "}" in word:
-                            bracket_stack.pop()
-                            if len(bracket_stack) == 0:
-                                content += word
-                                break
-                        content += (word+' ')
-                trigger = False
-        if len(path_list) > 0:
-            # 关键词搜索模式时
-            content = {}
-            for path in path_list:
-                content[path] = self.get_content(path)
-        return content
 
     def find_OperationRegion(self):
         '''
@@ -405,7 +89,7 @@ class AutoGen:
                     })
                 except AttributeError:
                     continue
-        if self.verbose:
+        if VERBOSE:
             for item in self.OR_info:
                 print(item)
             print()
@@ -435,7 +119,7 @@ class AutoGen:
         self.modified_fieldunit = []
         for OR_info in self.OR_info:
             OR_path = OR_info["Path"]+'.'+OR_info["Name"]
-            content = self.get_content(OR_path)
+            content = get_content.get_content(self.dsdt_content, OR_path)
             splited = content.split("}")
             for field in splited[:-1]:
                 flag = False  # Is there any field that needs special R/W in this method?
@@ -553,9 +237,9 @@ class AutoGen:
         self.method_to_patch = {}
         # Getting method content
         for unit in self.modified_fieldunit:
-            if self.verbose:
+            if VERBOSE:
                 print("Unit:", unit)
-            result = self.get_content(unit["name"])
+            result = get_content.search(self.dsdt_content, unit["name"])
             for name in result:
                 scope = '.'.join(name.split('.')[:-1])
                 if scope == "":
@@ -576,14 +260,10 @@ class AutoGen:
         # Patching method
         for scope in self.method_to_patch:
             for method in self.method_to_patch[scope]:
-                if self.verbose:
-                    print("""
-=============================
-| Patching: %s |
-=============================
-""" % method)
+                if VERBOSE:
+                    print("\n%s\n| Patching: %s |\n%s" % ('='*(14+len(method)), method, '='*(14+len(method))))
                 for unit in self.modified_fieldunit:
-                    if self.verbose:
+                    if VERBOSE:
                         print("Parsing", unit)
                     # Patch field writing, e.g. UNIT = xxxx
                     reserve = re.findall("%s = (\\w+)" % unit['name'], self.method_to_patch[scope][method])
@@ -685,7 +365,7 @@ class AutoGen:
         Disable HP laptops' ACEL device
         '''
         print("Patching ACEL...")
-        content = self.get_content("(ACEL)")
+        content = get_content.search(self.dsdt_content, "(ACEL)")
         for dev in content:
             if dev not in self.method_to_patch:
                 self.method_to_patch[dev] = {}
@@ -794,9 +474,8 @@ class AutoGen:
         '''
         out_path = []
         out_path.append(os.getcwd() + os.sep + 'Product')
-        out_path.append(self.filename.replace("DSDT", "SSDT-BATT"))
+        out_path.append(os.path.split(self.filepath.replace("DSDT", "SSDT-BATT"))[1])
         out_path[1] = out_path[1].replace("dsdt", "SSDT-BATT")
-        out_path[1] = re.sub('.*/', '', out_path[1])
 
         if not os.path.exists(out_path[0]):
             # If directory not exists
@@ -836,11 +515,86 @@ class AutoGen:
             print(TRY_TO_COMPILE_ANYWAY)
             os.system('iasl -f %s' % out_path)
 
+def opener(filepath:str):
+    try:
+        with open(filepath, 'r') as f:
+            content = f.read()
+    except FileNotFoundError:
+        print(FILE_NOT_FOUND_ERR)
+        exit(1)
+    except PermissionError:
+        print(PERMISSION_ERR)
+        exit(1)
+    return content
 
+def show_help():
+    print(HELP_MESSAGE)
+    exit()
 
+def parse_args():
+    '''
+    Parsing arguments and load file contents
+
+    @return: (filename, filepath, dsdt_content) - tuple(str)
+    '''
+    global VERBOSE, DEBUG
+    filename = filepath = dsdt_content = None
+    arg_lens = len(sys.argv)
+    if arg_lens == 1:
+        show_help()
+    for arg in sys.argv:
+        if '-h' in arg or 'help' in arg:
+            show_help()
+        if '-v' in arg:
+            VERBOSE = True
+        if '-debug' in arg:
+            VERBOSE = True
+            DEBUG = True
+        if '.dsl' in arg:
+            filename = arg
+            filepath = os.path.abspath(filename)
+            dsdt_content = opener(filepath=filepath)
+        if '.aml' in arg:
+            if os.path.exists('./iasl') and os.sys.platform == "darwin":
+                with os.popen("./iasl %s 2>&1" % arg) as p:
+                    ret = p.read()
+                    if "ASL Output" in ret:
+                        print(DECOMPILE_SUCCESS_MSG)
+                    else:
+                        print(ret)
+                        exit(1)
+            elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
+                with os.popen(".\\iasl.exe %s" % arg) as p:
+                    ret = p.read()
+                    if "ASL Output" in ret:
+                        print(DECOMPILE_SUCCESS_MSG)
+                    else:
+                        print(ret)
+                        exit(1)
+            else:
+                print(NO_IASL_COMPILER)
+                exit(1)
+            filename = arg.replace('.aml', '.dsl')
+            filepath = os.path.abspath(filename)
+            dsdt_content = opener(filepath=filepath)
+    if filepath and dsdt_content:
+        return (filepath, dsdt_content)
+    else:
+        show_help()
 
 if __name__ == '__main__':
     start_time = time.time()
-    app = AutoGen()
-    if app.verbose:
-        print("程序执行用时", time.time() - start_time, "秒")
+    filepath, dsdt_content = parse_args()
+
+    result = re.findall("PNP0C0A", dsdt_content)
+    if len(result) > 1:
+        print(TOO_MANY_BATT_ERR)
+        exit(1)
+    elif len(result) < 1:
+        print(TOO_FEW_BATT_ERR)
+        exit(1)
+    else:
+        # Single battery device
+        app = AutoGen(filepath=filepath, dsdt_content=dsdt_content)
+        if VERBOSE:
+            print("程序执行用时", time.time() - start_time, "秒")
