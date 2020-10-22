@@ -80,11 +80,17 @@ class AutoGen:
                 OR_info = re.search(  # 使用分组来获得 OperationRegion 的信息
                     "OperationRegion \\(%s, ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\\)" % OR, EC_content[dev])
                 try:
+                    if OR_info.group(2) == 'Zero':
+                        offset = 0
+                    elif OR_info.group(2) == 'One':
+                        offset = 1
+                    else:
+                        offset = int(OR_info.group(2), 16)
                     self.OR_info.append({
                         "Path": dev,
                         "Name": OR,
                         "Storage": OR_info.group(1),
-                        "Offset": OR_info.group(2),
+                        "Offset": offset,
                         "Length": OR_info.group(3)
                     })
                 except AttributeError:
@@ -116,8 +122,8 @@ class AutoGen:
         '''
         Finding out which unit field is going to be patched inside EC scope.
         '''
-        self.modified_fieldunit = []
         for OR_info in self.OR_info:
+            OR_info["field_unit"] = []
             OR_path = OR_info["Path"]+'.'+OR_info["Name"]
             content = get_content.get_content(self.dsdt_content, OR_path)
             splited = content.split("}")
@@ -140,7 +146,7 @@ class AutoGen:
                             if offset_bit/8 - int(offset_bit/8) != 0:
                                 print(FIELD_UNIT_OFFSET_ERR)
                                 exit(2)
-                            self.modified_fieldunit.append(
+                            OR_info["field_unit"].append(
                                 {"name": name, "offset": int(offset_bit/8), "size": size, "OR path": OR_path})
                             flag = True
                         offset_bit += size
@@ -156,7 +162,7 @@ class AutoGen:
                         self.ERM2 = self.rename('MEM')
                         self.WE1B = self.rename('W1B')
                         self.WECB = self.rename('WRB')
-                    for item in self.modified_fieldunit:
+                    for item in OR_info["field_unit"]:
                         if item["OR path"] == OR_path:
                             item["read method"] = self.RECB
                             item["write method"] = self.WECB
@@ -234,74 +240,75 @@ class AutoGen:
         '''
         Getting method content by unit fields which is going to be patched. And patch each method returned.
         '''
-        self.method_to_patch = {}
-        # Getting method content
-        for unit in self.modified_fieldunit:
-            if VERBOSE:
-                print("Unit:", unit)
-            result = get_content.search(self.dsdt_content, unit["name"])
-            for name in result:
-                scope = '.'.join(name.split('.')[:-1])
-                if scope == "":
-                    # Handle method like "Method (\WAK)"
-                    scope = "\\"
-                try:
-                    if name in self.method_to_patch[scope] or ("EC" not in name and "EC" not in result[name]):
-                        # remove duplicates, and remove fieldunit that not in EC scope
-                        continue
-                except KeyError:
-                    if "EC" not in name and "EC" not in result[name]:
-                        # Remove fieldunit that not in EC scope
-                        continue
-                if scope not in self.method_to_patch:
-                    self.method_to_patch[scope] = {}
-                self.method_to_patch[scope][name] = result[name]
-
-        # Patching method
-        for scope in self.method_to_patch:
-            for method in self.method_to_patch[scope]:
+        self.method = {}
+        for OR_info in self.OR_info:
+            # Getting method content
+            for unit in OR_info["field_unit"]:
                 if VERBOSE:
-                    print("\n%s\n| Patching: %s |\n%s" % ('='*(14+len(method)), method, '='*(14+len(method))))
-                for unit in self.modified_fieldunit:
+                    print("Unit:", unit)
+                result = get_content.search(self.dsdt_content, unit["name"])
+                for name in result:
+                    scope = '.'.join(name.split('.')[:-1])
+                    if scope == "":
+                        # Handle method like "Method (\WAK)"
+                        scope = "\\"
+                    try:
+                        if name in self.method[scope] or ("EC" not in name and "EC" not in result[name]):
+                            # remove duplicates, and remove fieldunit that not in EC scope
+                            continue
+                    except KeyError:
+                        if "EC" not in name and "EC" not in result[name]:
+                            # Remove fieldunit that not in EC scope
+                            continue
+                    if scope not in self.method:
+                        self.method[scope] = {}
+                    self.method[scope][name] = result[name]
+
+            # Patching method
+            for scope in self.method:
+                for method in self.method[scope]:
                     if VERBOSE:
-                        print("Parsing", unit)
-                    # Patch field writing, e.g. UNIT = xxxx
-                    reserve = re.findall("%s = (\\w+)" % unit['name'], self.method_to_patch[scope][method])
-                    for item in reserve:
-                        self.method_to_patch[scope][method] = self.method_to_patch[scope][method].replace(
-                            "%s = %s" % (unit['name'], item), 
-                            "%s (0x%X, %s, %s)" % (unit["write method"], 
-                                int(unit["offset"]), unit["size"], item)
-                        )
+                        print("\n%s\n| Patching: %s |\n%s" % ('='*(14+len(method)), method, '='*(14+len(method))))
+                    for unit in OR_info["field_unit"]:
+                        if VERBOSE:
+                            print("Parsing", unit)
+                        # Patch field writing, e.g. UNIT = xxxx
+                        reserve = re.findall("%s = (\\w+)" % unit['name'], self.method[scope][method])
+                        for item in reserve:
+                            self.method[scope][method] = self.method[scope][method].replace(
+                                "%s = %s" % (unit['name'], item), 
+                                "%s (0x%X, %s, %s)" % (unit["write method"], 
+                                    unit["offset"] + OR_info["Offset"], unit["size"], item)
+                            )
 
-                    # Patch field writing, e.g. Store (xxxx, UNIT)
-                    reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
-                        self.method_to_patch[scope][method])
-                    for item in reserve:
-                        self.method_to_patch[scope][method] = self.method_to_patch[scope][method].replace(
-                            "Store (%s, %s)" % (item, unit['name']),
-                            "%s (0x%X, %s, %s)" % (unit["write method"], 
-                                int(unit["offset"]), unit["size"], item)
-                        )
+                        # Patch field writing, e.g. Store (xxxx, UNIT)
+                        reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
+                            self.method[scope][method])
+                        for item in reserve:
+                            self.method[scope][method] = self.method[scope][method].replace(
+                                "Store (%s, %s)" % (item, unit['name']),
+                                "%s (0x%X, %s, %s)" % (unit["write method"], 
+                                    unit["offset"] + OR_info["Offset"], unit["size"], item)
+                            )
 
-                    # Patch field reading
-                    reserve = re.findall("(.*[^/])%s(\\W|\n)" % unit['name'], 
-                        self.method_to_patch[scope][method])
-                    for i in range(0, len(reserve)):
-                        if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
-                            continue  # stop patching method that have the same name as fieldunit
-                        self.method_to_patch[scope][method] = self.method_to_patch[scope][method].replace(
-                            reserve[i][0]+unit['name']+reserve[i][1], 
-                            '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
-                                int(unit['offset']), unit['size'], reserve[i][1]), 
-                        )
+                        # Patch field reading
+                        reserve = re.findall("(.*[^/])%s(\\W|\n)" % unit['name'], 
+                            self.method[scope][method])
+                        for i in range(0, len(reserve)):
+                            if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
+                                continue  # stop patching method that have the same name as fieldunit
+                            self.method[scope][method] = self.method[scope][method].replace(
+                                reserve[i][0]+unit['name']+reserve[i][1], 
+                                '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
+                                    unit['offset'] + OR_info["Offset"], unit['size'], reserve[i][1]), 
+                            )
 
-                modified = False
-                for unit in self.modified_fieldunit:
-                    if unit['read method'] in self.method_to_patch[scope][method] or unit['write method'] in self.method_to_patch[scope][method]:
-                        modified = True
-                if not modified:
-                    self.method_to_patch[scope][method] = None
+                    modified = False
+                    for unit in OR_info["field_unit"]:
+                        if unit['read method'] in self.method[scope][method] or unit['write method'] in self.method[scope][method]:
+                            modified = True
+                    if not modified:
+                        self.method[scope][method] = None
                 
 
 
@@ -309,27 +316,27 @@ class AutoGen:
         '''
         Insert 'If (_OSI ("Darwin"))' into each method to avoid affacting Windows which is booted with OpenCore.
         '''
-        for scope in self.method_to_patch:
-            for method in self.method_to_patch[scope]:
-                if not self.method_to_patch[scope][method]:
+        for scope in self.method:
+            for method in self.method[scope]:
+                if not self.method[scope][method]:
                     # Skip deleted method
                     continue
                 stack = []
                 method_info = re.search(
                     'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
-                    self.method_to_patch[scope][method]).groups()
+                    self.method[scope][method]).groups()
 
                 # Insert if _OSI at the beginning
-                self.method_to_patch[scope][method] = re.sub(
+                self.method[scope][method] = re.sub(
                     'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
                     "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
                     method_info[0], method_info[1], method_info[2]), 
-                    self.method_to_patch[scope][method])
+                    self.method[scope][method])
 
-                for index in range(0, len(self.method_to_patch[scope][method])):
-                    if "{" in self.method_to_patch[scope][method][index]:
+                for index in range(0, len(self.method[scope][method])):
+                    if "{" in self.method[scope][method][index]:
                         stack.append('{')
-                    if "}" in self.method_to_patch[scope][method][index]:
+                    if "}" in self.method[scope][method][index]:
                         stack.pop()
                         if len(stack) == 1:
                             arg = ''
@@ -338,13 +345,13 @@ class AutoGen:
                                     arg += ', '
                                 arg += 'Arg%d' % i
                             # Insert return original method at the bottom
-                            self.method_to_patch[scope][method] = self.method_to_patch[scope][method][:index] + \
+                            self.method[scope][method] = self.method[scope][method][:index] + \
                                 "}\n        Else\n        {\n            Return(X%s(%s))\n        }\n" % (
-                                method_info[0][-3:], arg) + self.method_to_patch[scope][method][index:]
+                                method_info[0][-3:], arg) + self.method[scope][method][index:]
                             break
 
                 stack = []
-                splited = self.method_to_patch[scope][method].split('\n')
+                splited = self.method[scope][method].split('\n')
                 # Parse line by line
                 for index in range(0, len(splited)):
                     # Delete space at front of each line
@@ -358,7 +365,7 @@ class AutoGen:
                         if '}' not in splited[index]:
                             stack.append('{')
 
-                self.method_to_patch[scope][method] = '\n'.join(splited)
+                self.method[scope][method] = '\n'.join(splited)
 
     def patch_ACEL(self):
         '''
@@ -367,9 +374,9 @@ class AutoGen:
         print("Patching ACEL...")
         content = get_content.search(self.dsdt_content, "(ACEL)")
         for dev in content:
-            if dev not in self.method_to_patch:
-                self.method_to_patch[dev] = {}
-            self.method_to_patch[dev]["%s._STA"%dev] = '''        Method (_STA, 0, NotSerialized) 
+            if dev not in self.method:
+                self.method[dev] = {}
+            self.method[dev]["%s._STA"%dev] = '''        Method (_STA, 0, NotSerialized) 
         {
             If (_OSI("Darwin")) 
             {
@@ -416,13 +423,13 @@ class AutoGen:
 ''' % (name, find, replace)
 
         # generate ACPI patch
-        for scope in self.method_to_patch:
-            for method in self.method_to_patch[scope]:
-                if not self.method_to_patch[scope][method]:
+        for scope in self.method:
+            for method in self.method[scope]:
+                if not self.method[scope][method]:
                     # Skip deleted method
                     continue
                 method_info = list(re.search("Method \((.*?), (\d+?), (Serialized|NotSerialized)\)", 
-                    self.method_to_patch[scope][method]).groups())
+                    self.method[scope][method]).groups())
                 method_info[0] = method_info[0].replace("\\", "")
                 if method_info[0] in dangerous_patch_list:
                     # Warning user if this tool patched some dangerous methods
@@ -451,20 +458,20 @@ class AutoGen:
         '''
         self.file_generated = self.comment
         self.file_generated += (self.head + self.RW_method)
-        for scope in self.method_to_patch:
+        for scope in self.method:
             have_method = False
-            for method in self.method_to_patch[scope]:
-                if self.method_to_patch[scope][method]:
+            for method in self.method[scope]:
+                if self.method[scope][method]:
                     have_method = True
             if not have_method:
                 # Skip empty scope
                 continue
             self.file_generated += "    Scope (%s)\n    {\n" % scope
-            for method in self.method_to_patch[scope]:
-                if not self.method_to_patch[scope][method]:
+            for method in self.method[scope]:
+                if not self.method[scope][method]:
                     # Skip deleted method
                     continue
-                self.file_generated += self.method_to_patch[scope][method] + '\n'
+                self.file_generated += self.method[scope][method] + '\n'
             self.file_generated += "    }\n"
         self.file_generated += '}\n'
 
