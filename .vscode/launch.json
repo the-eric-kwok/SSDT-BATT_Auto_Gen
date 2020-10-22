@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v",
-                "Sample/DSDT_Lenovo-W541.dsl"
+                "Sample/DSDT_HUAWEI_Magicbook.dsl"
             ]
         }
     ]

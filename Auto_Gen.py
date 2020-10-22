@@ -87,11 +87,11 @@ class AutoGen:
                     else:
                         offset = int(OR_info.group(2), 16)
                     self.OR_info.append({
-                        "Path": dev,
-                        "Name": OR,
-                        "Storage": OR_info.group(1),
-                        "Offset": offset,
-                        "Length": OR_info.group(3)
+                        "path": dev,
+                        "name": OR,
+                        "storage": OR_info.group(1),
+                        "offset": offset,
+                        "length": OR_info.group(3)
                     })
                 except AttributeError:
                     continue
@@ -124,14 +124,14 @@ class AutoGen:
         '''
         for OR_info in self.OR_info:
             OR_info["field_unit"] = []
-            OR_path = OR_info["Path"]+'.'+OR_info["Name"]
+            OR_path = OR_info["path"]+'.'+OR_info["name"]
             content = get_content.get_content(self.dsdt_content, OR_path)
             splited = content.split("}")
             for field in splited[:-1]:
                 flag = False  # Is there any field that needs special R/W in this method?
                 tmp = field.split('{')
                 field_content = tmp[1].split('\n')
-                offset_bit = 0  # Offset in bits
+                offset_bit = 0  # offset in bits
                 name = ''
                 size = 0
                 for item in field_content:
@@ -156,7 +156,7 @@ class AutoGen:
                         offset_bit = int(offset, 16) * 8
 
                 if flag:
-                    if OR_info["Storage"] not in self.RW_method and OR_info["Path"] not in self.RW_method:
+                    if OR_info["storage"] not in self.RW_method and OR_info["path"] not in self.RW_method:
                         self.RE1B = self.rename('R1B')
                         self.RECB = self.rename('RDB')
                         self.ERM2 = self.rename('MEM')
@@ -186,7 +186,7 @@ class AutoGen:
             // Arg0 - offset in bytes from zero-based EC
             // Arg1 - size of buffer in bits
             Arg1 = ((Arg1 + 0x07) >> 0x03)
-            Name (TEMP, Buffer (Arg1){})
+            name (TEMP, Buffer (Arg1){})
             Arg1 += Arg0
             Local0 = Zero
             While ((Arg0 < Arg1))
@@ -217,7 +217,7 @@ class AutoGen:
             // Arg1 - size of buffer in bits
             // Arg2 - data to be written
             Arg1 = ((Arg1 + 0x07) >> 0x03)
-            Name (TEMP, Buffer (Arg1){})
+            name (TEMP, Buffer (Arg1){})
             TEMP = Arg2
             Arg1 += Arg0
             Local0 = Zero
@@ -229,9 +229,9 @@ class AutoGen:
             }
         }
     }
-''' % (OR_info["Path"], self.RE1B, self.ERM2, OR_info["Storage"], 
+''' % (OR_info["path"], self.RE1B, self.ERM2, OR_info["storage"], 
             self.ERM2, self.RECB, self.RE1B, self.WE1B, self.ERM2, 
-            OR_info["Storage"], self.ERM2, self.WECB, self.WE1B)
+            OR_info["storage"], self.ERM2, self.WECB, self.WE1B)
         if "RECB" not in self.RW_method:
             print(NOT_NEED_TO_PATCH_MSG)
             exit(0)
@@ -278,7 +278,7 @@ class AutoGen:
                             self.method[scope][method] = self.method[scope][method].replace(
                                 "%s = %s" % (unit['name'], item), 
                                 "%s (0x%X, %s, %s)" % (unit["write method"], 
-                                    unit["offset"] + OR_info["Offset"], unit["size"], item)
+                                    unit["offset"] + OR_info["offset"], unit["size"], item)
                             )
 
                         # Patch field writing, e.g. Store (xxxx, UNIT)
@@ -288,7 +288,7 @@ class AutoGen:
                             self.method[scope][method] = self.method[scope][method].replace(
                                 "Store (%s, %s)" % (item, unit['name']),
                                 "%s (0x%X, %s, %s)" % (unit["write method"], 
-                                    unit["offset"] + OR_info["Offset"], unit["size"], item)
+                                    unit["offset"] + OR_info["offset"], unit["size"], item)
                             )
 
                         # Patch field reading
@@ -300,7 +300,7 @@ class AutoGen:
                             self.method[scope][method] = self.method[scope][method].replace(
                                 reserve[i][0]+unit['name']+reserve[i][1], 
                                 '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
-                                    unit['offset'] + OR_info["Offset"], unit['size'], reserve[i][1]), 
+                                    unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]), 
                             )
 
                     modified = False
