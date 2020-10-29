@@ -37,8 +37,9 @@ def get_content(dsdt_content:str, target: str):
                 is_string = not is_string
             continue
 
-        if dsdt_splited[i] == "DefinitionBlock":
-            stack.append("DefinitionBlock")
+        if "DefinitionBlock" in dsdt_splited[i]:
+            if not is_string:
+                stack.append("DefinitionBlock")
 
         elif dsdt_splited[i] == "Field":
             try:
@@ -263,8 +264,9 @@ def search(dsdt_content:str, target:str):
                 is_string = not is_string
             continue
 
-        if dsdt_splited[i] == "DefinitionBlock":
-            stack.append("DefinitionBlock")
+        if "DefinitionBlock" in dsdt_splited[i]:
+            if not is_string:
+                stack.append("DefinitionBlock")
 
         elif dsdt_splited[i] == "Field":
             try:
