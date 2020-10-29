@@ -12,6 +12,7 @@ dangerous_patch_list = ['_PTS', '_WAK', '_STA', '_CRS', '_REG', '_ADR', '_PRW', 
     '_PS2', '_PS3', '_PS4', '_PS5', '_S0D', '_S1D', '_S2D', '_S3D', '_S4D', '_S5D']
 VERBOSE = False
 DEBUG = False
+FORCE = False
 
 class AutoGen:
     OR_info = []
@@ -75,7 +76,7 @@ class AutoGen:
         EC_content = self.EC_content
         for dev in EC_content:
             OR_list = re.findall(
-                "OperationRegion \\(([A-Z]{4}),", EC_content[dev])
+                "OperationRegion \\(([A-Z0-9]{4}),", EC_content[dev])
             for OR in OR_list:
                 OR_info = re.search(  # 使用分组来获得 OperationRegion 的信息
                     "OperationRegion \\(%s, ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\\)" % OR, EC_content[dev])
@@ -537,7 +538,7 @@ def parse_args():
 
     @return: (filename, filepath, dsdt_content) - tuple(str)
     '''
-    global VERBOSE, DEBUG
+    global VERBOSE, DEBUG, FORCE
     filename = filepath = dsdt_content = None
     arg_lens = len(sys.argv)
     if arg_lens == 1:
@@ -547,6 +548,8 @@ def parse_args():
             show_help()
         if '-v' in arg:
             VERBOSE = True
+        if '-F' in arg or '--force' in arg:
+            FORCE = True
         if '-debug' in arg:
             VERBOSE = True
             DEBUG = True
@@ -587,14 +590,15 @@ if __name__ == '__main__':
     filepath, dsdt_content = parse_args()
 
     result = re.findall("PNP0C0A", dsdt_content)
-    if len(result) > 1:
-        print(TOO_MANY_BATT_ERR)
-        exit(1)
-    elif len(result) < 1:
-        print(TOO_FEW_BATT_ERR)
-        exit(1)
-    else:
-        # Single battery device
-        app = AutoGen(filepath=filepath, dsdt_content=dsdt_content)
-        if VERBOSE:
-            print("程序执行用时", time.time() - start_time, "秒")
+    if not FORCE:
+        if len(result) > 1:
+            print(TOO_MANY_BATT_ERR)
+            exit(1)
+        elif len(result) < 1:
+            print(TOO_FEW_BATT_ERR)
+            exit(1)
+    
+    # Single battery device
+    app = AutoGen(filepath=filepath, dsdt_content=dsdt_content)
+    if VERBOSE:
+        print("程序执行用时", time.time() - start_time, "秒")
