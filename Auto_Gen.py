@@ -481,8 +481,10 @@ class AutoGen:
         Write to dsl file, and also try to compile it automatically.
         '''
         out_path = []
-        out_path.append(os.getcwd() + os.sep + 'Product')
+        out_path.append(os.path.expanduser('~') + os.sep + 'Desktop' + os.sep + 'Battery_hotpatch')
+        # Replace DSDT with SSDT-BATT and fill it in filename
         out_path.append(os.path.split(self.filepath.replace("DSDT", "SSDT-BATT"))[1])
+        # Replace dsdt with SSDT-BATT in filename
         out_path[1] = out_path[1].replace("dsdt", "SSDT-BATT")
 
         if not os.path.exists(out_path[0]):

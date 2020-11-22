@@ -23,5 +23,8 @@
 - [x] 同一个 Scope 的方法合并
 - [x] Mutex 置零补丁生成
 - [x] 重命名补丁生成
+- [ ] 手动输入机型
+- [x] 生成产品在桌面
+- [ ] Field 在其他 EC Scope 的时候报“无需patch”，如 Sample/DSDT.dsl
 - [ ] 多个PNP0C09设备（如 DSDT-Acel_A715-73G.aml ）
 - [ ] 双电池补丁
