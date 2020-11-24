@@ -263,7 +263,7 @@ class AutoGen:
                             continue
                     if scope not in self.method:
                         self.method[scope] = {}
-                    self.method[scope][name] = result[name]
+                    self.method[scope][name] = {"content":result[name], "modified":False}
 
             # Patching method
             for scope in self.method:
@@ -274,42 +274,42 @@ class AutoGen:
                         if VERBOSE:
                             print("Parsing", unit)
                         # Patch field writing, e.g. UNIT = xxxx
-                        reserve = re.findall("%s = (\\w+)" % unit['name'], self.method[scope][method])
+                        reserve = re.findall("%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
                         for item in reserve:
-                            self.method[scope][method] = self.method[scope][method].replace(
+                            self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
                                 "%s = %s" % (unit['name'], item), 
                                 "%s (0x%X, %s, %s)" % (unit["write method"], 
                                     unit["offset"] + OR_info["offset"], unit["size"], item)
                             )
+                            self.method[scope][method]['modified'] = True
 
                         # Patch field writing, e.g. Store (xxxx, UNIT)
                         reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
-                            self.method[scope][method])
+                            self.method[scope][method]["content"])
                         for item in reserve:
-                            self.method[scope][method] = self.method[scope][method].replace(
+                            self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
                                 "Store (%s, %s)" % (item, unit['name']),
                                 "%s (0x%X, %s, %s)" % (unit["write method"], 
                                     unit["offset"] + OR_info["offset"], unit["size"], item)
                             )
+                            self.method[scope][method]['modified'] = True
 
                         # Patch field reading
-                        reserve = re.findall("(.*[^/])%s(\\W|\n)" % unit['name'], 
-                            self.method[scope][method])
+                        reserve = re.findall("(.*[^/])%s( |\n)" % unit['name'], 
+                            self.method[scope][method]['content'])
                         for i in range(0, len(reserve)):
                             if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
                                 continue  # stop patching method that have the same name as fieldunit
-                            self.method[scope][method] = self.method[scope][method].replace(
+                            self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
                                 reserve[i][0]+unit['name']+reserve[i][1], 
                                 '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
                                     unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]), 
                             )
+                            self.method[scope][method]['modified'] = True
 
-                    modified = False
-                    for unit in OR_info["field_unit"]:
-                        if unit['read method'] in self.method[scope][method] or unit['write method'] in self.method[scope][method]:
-                            modified = True
-                    if not modified:
-                        self.method[scope][method] = None
+                    
+                    if not self.method[scope][method]['modified']:
+                        self.method[scope][method]["content"] = None
                 
 
 
@@ -325,19 +325,19 @@ class AutoGen:
                 stack = []
                 method_info = re.search(
                     'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
-                    self.method[scope][method]).groups()
+                    self.method[scope][method]['content']).groups()
 
                 # Insert if _OSI at the beginning
-                self.method[scope][method] = re.sub(
+                self.method[scope][method]["content"] = re.sub(
                     'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)', 
                     "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
                     method_info[0], method_info[1], method_info[2]), 
-                    self.method[scope][method])
+                    self.method[scope][method]["content"])
 
-                for index in range(0, len(self.method[scope][method])):
-                    if "{" in self.method[scope][method][index]:
+                for index in range(0, len(self.method[scope][method]["content"])):
+                    if "{" in self.method[scope][method]['content'][index]:
                         stack.append('{')
-                    if "}" in self.method[scope][method][index]:
+                    if "}" in self.method[scope][method]['content'][index]:
                         stack.pop()
                         if len(stack) == 1:
                             arg = ''
@@ -346,13 +346,13 @@ class AutoGen:
                                     arg += ', '
                                 arg += 'Arg%d' % i
                             # Insert return original method at the bottom
-                            self.method[scope][method] = self.method[scope][method][:index] + \
+                            self.method[scope][method]["content"] = self.method[scope][method]['content'][:index] + \
                                 "}\n        Else\n        {\n            Return(X%s(%s))\n        }\n" % (
-                                method_info[0][-3:], arg) + self.method[scope][method][index:]
+                                method_info[0][-3:], arg) + self.method[scope][method]["content"][index:]
                             break
 
                 stack = []
-                splited = self.method[scope][method].split('\n')
+                splited = self.method[scope][method]["content"].split('\n')
                 # Parse line by line
                 for index in range(0, len(splited)):
                     # Delete space at front of each line
@@ -366,7 +366,7 @@ class AutoGen:
                         if '}' not in splited[index]:
                             stack.append('{')
 
-                self.method[scope][method] = '\n'.join(splited)
+                self.method[scope][method]["content"] = '\n'.join(splited)
 
     def patch_ACEL(self):
         '''
@@ -430,7 +430,7 @@ class AutoGen:
                     # Skip deleted method
                     continue
                 method_info = list(re.search("Method \((.*?), (\d+?), (Serialized|NotSerialized)\)", 
-                    self.method[scope][method]).groups())
+                    self.method[scope][method]["content"]).groups())
                 method_info[0] = method_info[0].replace("\\", "")
                 if method_info[0] in dangerous_patch_list:
                     # Warning user if this tool patched some dangerous methods
@@ -472,7 +472,7 @@ class AutoGen:
                 if not self.method[scope][method]:
                     # Skip deleted method
                     continue
-                self.file_generated += self.method[scope][method] + '\n'
+                self.file_generated += self.method[scope][method]["content"] + '\n'
             self.file_generated += "    }\n"
         self.file_generated += '}\n'
 
@@ -502,6 +502,7 @@ class AutoGen:
                 try:
                     with open(test, 'x') as f:
                         f.write(self.file_generated)
+                        out_path = self.out_path = test
                         print(GENERATE_SUCCESSFUL_MSG)
                     break
                 except FileExistsError:
@@ -510,10 +511,7 @@ class AutoGen:
         if os.path.exists('./iasl') and os.sys.platform == "darwin":
             with os.popen("./iasl -f %s 2>&1" % out_path) as p:
                 ret = p.read()
-                if "AML Output" in ret:
-                    print(COMPILE_SUCCESS_MSG)
-                else:
-                    print(ret)
+                print(ret)
         elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
             with os.popen(".\\iasl.exe -f %s" % out_path) as p:
                 ret = p.read()

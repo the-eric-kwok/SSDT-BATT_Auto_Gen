@@ -26,5 +26,6 @@
 - [ ] 手动输入机型
 - [x] 生成产品在桌面
 - [ ] Field 在其他 EC Scope 的时候报“无需patch”，如 Sample/DSDT.dsl
-- [ ] 多个PNP0C09设备（如 DSDT-Acel_A715-73G.aml ）
+- [ ] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）
 - [ ] 双电池补丁
+- [ ] External 声明添加
