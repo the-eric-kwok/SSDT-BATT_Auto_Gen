@@ -8,8 +8,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-v",
-                "Sample/DSDT.dsl"
+                "-v -debug",
+                "Sample/DSDT-Acel_A715-73G.dsl"
             ]
         }
     ]
