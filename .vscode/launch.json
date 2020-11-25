@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v",
-                "Sample/DSDT.dsl"
+                "Sample/DSDT_HP-Pavillion-15.dsl"
             ]
         }
     ]

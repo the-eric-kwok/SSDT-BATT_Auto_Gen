@@ -377,7 +377,8 @@ class AutoGen:
         for dev in content:
             if dev not in self.method:
                 self.method[dev] = {}
-            self.method[dev]["%s._STA"%dev] = '''        Method (_STA, 0, NotSerialized) 
+            self.method[dev]["%s._STA"%dev] = {
+                'content':'''        Method (_STA, 0, NotSerialized) 
         {
             If (_OSI("Darwin")) 
             {
@@ -388,7 +389,9 @@ class AutoGen:
                 Return(XSTA())
             }
         }
-'''
+''',
+                'modified':True
+            }
 
     def special_devices(self):
         '''
@@ -509,11 +512,11 @@ class AutoGen:
                     pass
         
         if os.path.exists('./iasl') and os.sys.platform == "darwin":
-            with os.popen("./iasl -f %s 2>&1" % out_path) as p:
+            with os.popen("./iasl -va -f %s 2>&1" % out_path) as p:
                 ret = p.read()
                 print(ret)
         elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-            with os.popen(".\\iasl.exe -f %s" % out_path) as p:
+            with os.popen(".\\iasl.exe -va -f %s" % out_path) as p:
                 ret = p.read()
                 if "AML Output" in ret:
                     print(COMPILE_SUCCESS_MSG)
@@ -521,7 +524,7 @@ class AutoGen:
                     print(ret)
         else:
             print(TRY_TO_COMPILE_ANYWAY)
-            os.system('iasl -f %s' % out_path)
+            os.system('iasl -va -f %s' % out_path)
 
 def opener(filepath:str):
     try:
