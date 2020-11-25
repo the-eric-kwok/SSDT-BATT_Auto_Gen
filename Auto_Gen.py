@@ -74,7 +74,6 @@ class AutoGen:
         Finding OperationRegion(s) inside EC scope.
         '''
         EC_content = self.EC_content
-        print(EC_content)
         for dev in EC_content:
             OR_list = re.findall(
                 "OperationRegion \\(([A-Z0-9]{2,4}),", EC_content[dev])
