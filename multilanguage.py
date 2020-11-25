@@ -29,7 +29,7 @@ TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?
 GENERATE_SUCCESSFUL_MSG = "\033[1;36mSuccessfully generate SSDT-BATT.dsl patch under ./Product folder\033[0m"
 NOT_NEED_TO_PATCH_MSG = '\033[1;36mThis DSDT does not need to be patched! Drop SMCBatteryManager.kext and enjoy!\033[0m'
 IS_THIS_HP_LAPTOP = '\033[1;36mI see ACEL device in this DSDT, is this HP laptop? (yes/no)\033[0m'
-COMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully compiled! Please check ./Product folder.\033[0m'
+COMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully compiled! Please check your desktop.\033[0m'
 DECOMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully decompiled!\033[0m'
 TRY_TO_COMPILE_ANYWAY = '\033[1;36miasl compiler not found in working directory, trying to compile anyway.\nIf you didn\'t found .aml file under ./Product folder, you should compile the .dsl file using -f (force) option\033[0m'
 DANGEROUS_PATCH_MSG = ['\033[1;31mThis patch includes dangerous binary patch: ', '->', ' You should review it before apply!!\n(Use Hex Fiend to extend the heximal code, make sure it\'s unique in whole DSDT.aml)\033[0m']
@@ -69,7 +69,7 @@ Options:
     GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl补丁文件，该文件位于 ./Product 文件夹中\033[0m'
     NOT_NEED_TO_PATCH_MSG = '\033[1;36m该 DSDT 不需要热补丁即可正常显示电量，放入 SMCBatteryManager.kext 即可！\033[0m'
     IS_THIS_HP_LAPTOP = '\033[1;36m我在此文件中看到了 ACEL 设备，这是一台惠普笔记本吗？ (yes/no)\033[0m'
-    COMPILE_SUCCESS_MSG = '\033[1;36m成功编译！请看看 ./Product 文件夹\033[0m'
+    COMPILE_SUCCESS_MSG = '\033[1;36m成功编译！补丁生成于桌面上\033[0m'
     DECOMPILE_SUCCESS_MSG = '\033[1;36m成功反编译！\033[0m'
     TRY_TO_COMPILE_ANYWAY = '\033[1;36m我在当前目录下没找到 iasl 编译器，不过无论如何我还是尝试为您编译\n如果您没有在 ./Product 文件夹下看到 .aml 文件，您应该使用 -f (强制) 选项手动编译 dsl 文件\033[0m'
     DANGEROUS_PATCH_MSG = ['\033[1;31m这个补丁包含了危险的二进制更名：', '->', ' 您应该自行制作此更名补丁\n（使用 Hex Fiend 工具延长十六进制片段，以确保其唯一性）\033[0m']
@@ -105,7 +105,7 @@ Options:
     NOT_NEED_TO_PATCH_MSG = '\033[1;36m該 DSDT 不需要打補丁即可正常顯示電量，放入 SMCBatteryManager.kext 即可！\033[0m'
     GENERATE_SUCCESSFUL_MSG = '\033[1;36m成功生成了 SSDT-BATT.dsl 補丁文件，該文件位於 ./Product 文件夾中\033[0m'
     IS_THIS_HP_LAPTOP = '\033[1;36m我在此文件中看到了 ACEL 設備，這是一台惠普筆電嗎？？ (yes/no)\033[0m'
-    COMPILE_SUCCESS_MSG = '\033[1;36m成功編譯！請看看 ./Product 文件夾\033[0m'
+    COMPILE_SUCCESS_MSG = '\033[1;36m成功編譯！補丁生成於桌面上\033[0m'
     DECOMPILE_SUCCESS_MSG = '\033[1;36m成功反编译！\033[0m'
     TRY_TO_COMPILE_ANYWAY = '\033[1;36m我在當前目錄下沒看到 iasl 編譯器，不過無論如何我還是嘗試為您編譯\n如果您沒有在 ./Product 文件夾下看到 .aml 文件，您應該使用 -f (強制) 選項手動編譯 dsl 文件\033[0m'
     DANGEROUS_PATCH_MSG = ['\033[1;31m這個補丁包含了危險的二進制更名：', '->', ' 您應該自行製作此更名補丁\n（使用 Hex Fiend 工具延長十六進制片段，以確保其唯一性）\033[0m']

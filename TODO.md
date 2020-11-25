@@ -26,5 +26,6 @@
 - [ ] 手动输入机型
 - [x] 生成产品在桌面
 - [x] Field 名字只有三个字母的时候报“无需patch”，如 Sample/DSDT.dsl
-- [ ] 多个PNP0C0A设备（如 DSDT-Acel_A715-73G.aml ）
+- [ ] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）
 - [ ] 双电池补丁
+- [ ] External 声明添加
