@@ -294,8 +294,8 @@ class AutoGen:
                             )
                             self.method[scope][method]['modified'] = True
 
-                        # Patch field reading
-                        reserve = re.findall("(.*[^/])%s( |\n)" % unit['name'], 
+                        # Patch field reading, actually it's patch all other situation
+                        reserve = re.findall("(.*)%s(.*)" % unit['name'], 
                             self.method[scope][method]['content'])
                         for i in range(0, len(reserve)):
                             if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
@@ -368,43 +368,43 @@ class AutoGen:
 
                 self.method[scope][method]["content"] = '\n'.join(splited)
 
-    def patch_ACEL(self):
-        '''
-        Disable HP laptops' ACEL device
-        '''
-        print("Patching ACEL...")
-        content = get_content.search(self.dsdt_content, "(ACEL)")
-        for dev in content:
-            if dev not in self.method:
-                self.method[dev] = {}
-            self.method[dev]["%s._STA"%dev] = {
-                'content':'''        Method (_STA, 0, NotSerialized) 
-        {
-            If (_OSI("Darwin")) 
-            {
-                Return (0)
-            }
-            Else 
-            {
-                Return(XSTA())
-            }
-        }
-''',
-                'modified':True
-            }
-
     def special_devices(self):
         '''
         This method automatically patch some special laptops. For example, some HP laptop have ACEL device, 
         which will cause battery info not able to be updated.
         '''
+        def patch_ACEL(self):
+            '''
+            Disable HP laptops' ACEL device
+            '''
+            print("Patching ACEL...")
+            content = get_content.search(self.dsdt_content, "(ACEL)")
+            for dev in content:
+                if dev not in self.method:
+                    self.method[dev] = {}
+                self.method[dev]["%s._STA"%dev] = {
+                    'content':'''        Method (_STA, 0, NotSerialized) 
+            {
+                If (_OSI("Darwin")) 
+                {
+                    Return (0)
+                }
+                Else 
+                {
+                    Return(XSTA())
+                }
+            }
+    ''',
+                    'modified':True
+                }
+
         if "Device (ACEL)" in self.dsdt_content:
             if "HPQOEM" not in self.dsdt_content:
                 print(IS_THIS_HP_LAPTOP)
                 inp = input()
                 if inp == 'yes' or inp == 'y':
-                    self.patch_ACEL()
-            self.patch_ACEL()
+                    patch_ACEL(self)
+            patch_ACEL(self)
 
     def generate_comment(self):
         # Find mutex and set them to zero
@@ -455,6 +455,9 @@ class AutoGen:
 // Replace: %s
 
 ''' % (method_info[0], method_info[0][1:], find, replace)
+
+        # TODO generate FieldUnit indicator by searching their Read method and offset
+        
 
     def assemble(self):
         '''
