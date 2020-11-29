@@ -7,8 +7,9 @@ import re
 from multilanguage import *
 import time
 import get_content
+import copy
 
-dangerous_patch_list = ['_PTS', '_WAK', '_STA', '_CRS', '_REG', '_ADR', '_PRW', '_DCS', '_DGS', '_DSS', '_INI', '_PS0', '_PS1',
+dangerous_patch_list = ['_STA', '_CRS', '_REG', '_ADR', '_PRW', '_DCS', '_DGS', '_DSS', '_INI', '_PS0', '_PS1',
     '_PS2', '_PS3', '_PS4', '_PS5', '_S0D', '_S1D', '_S2D', '_S3D', '_S4D', '_S5D']
 VERBOSE = False
 DEBUG = False
@@ -32,10 +33,12 @@ class AutoGen:
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
+        self.patch_PTSWAK()
         self.insert_osi()
         self.special_devices()
         self.generate_comment()
         self.assemble()
+        self.re_indent()
         self.write_file()
 
     def clean_out(self):
@@ -249,6 +252,9 @@ class AutoGen:
                     print("Unit:", unit)
                 result = get_content.search(self.dsdt_content, unit["name"])
                 for name in result:
+                    if result[name].split()[0] != "Method":
+                        # Ignore content which is not Method
+                        continue
                     scope = '.'.join(name.split('.')[:-1])
                     if scope == "":
                         # Handle method like "Method (\WAK)"
@@ -273,44 +279,246 @@ class AutoGen:
                     for unit in OR_info["field_unit"]:
                         if VERBOSE:
                             print("Parsing", unit)
-                        # Patch field writing, e.g. UNIT = xxxx
-                        reserve = re.findall("%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
-                        for item in reserve:
-                            self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                "%s = %s" % (unit['name'], item), 
-                                "%s (0x%X, %s, %s)" % (unit["write method"], 
-                                    unit["offset"] + OR_info["offset"], unit["size"], item)
-                            )
-                            self.method[scope][method]['modified'] = True
+                        if scope == '.'.join(unit['OR path'].split('.')[:-1]):
+                            # Patch field writing, e.g. UNIT = xxxx
+                            reserve = re.findall("([^\.])%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
+                            for item in reserve:
+                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                    "%s%s = %s" % (item[0], unit['name'], item[1]), 
+                                    "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"], 
+                                        unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                )
+                                self.method[scope][method]['modified'] = True
 
-                        # Patch field writing, e.g. Store (xxxx, UNIT)
-                        reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
-                            self.method[scope][method]["content"])
-                        for item in reserve:
-                            self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                "Store (%s, %s)" % (item, unit['name']),
-                                "%s (0x%X, %s, %s)" % (unit["write method"], 
-                                    unit["offset"] + OR_info["offset"], unit["size"], item)
-                            )
-                            self.method[scope][method]['modified'] = True
+                            # Patch field writing, e.g. Store (xxxx, UNIT)
+                            reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'], 
+                                self.method[scope][method]["content"])
+                            for item in reserve:
+                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                    "Store (%s, %s)" % (item, unit['name']),
+                                    "%s (0x%X, %s, %s)" % (unit["write method"], 
+                                        unit["offset"] + OR_info["offset"], unit["size"], item)
+                                )
+                                self.method[scope][method]['modified'] = True
 
-                        # Patch field reading, actually it's patch all other situation
-                        reserve = re.findall("(.*)%s(.*)" % unit['name'], 
-                            self.method[scope][method]['content'])
-                        for i in range(0, len(reserve)):
-                            if "Method (" in reserve[i][0] or "Device (" in reserve[i][0]:
-                                continue  # stop patching method that have the same name as fieldunit
-                            self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                reserve[i][0]+unit['name']+reserve[i][1], 
-                                '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
-                                    unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]), 
-                            )
-                            self.method[scope][method]['modified'] = True
+                            # Patch field reading, e.g. xxxx = UNIT
+                            reserve = re.findall("(.*[^\.])%s(.*)" % unit['name'], 
+                                self.method[scope][method]['content'])
+                            for i in range(0, len(reserve)):
+                                if "Method (" in reserve[i][0] or "Device (" in reserve[i][0] or "Scope (" in reserve[i][0]:
+                                    continue  # stop patching method that have the same name as fieldunit
+                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                    reserve[i][0]+unit['name']+reserve[i][1], 
+                                    '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
+                                        unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]), 
+                                )
+                                self.method[scope][method]['modified'] = True
 
-                    
-                    if not self.method[scope][method]['modified']:
-                        self.method[scope][method]["content"] = None
+                        else:
+                            # Patch field writing, e.g. EC0.UNIT = xxxx
+                            reserve = re.findall("(.*%s\.)%s = (\\w+)" % (unit['OR path'].split('.')[-2], unit['name']), 
+                                self.method[scope][method]["content"])
+                            for item in reserve:
+                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                    "%s%s = %s" % (item[0], unit['name'], item[1]), 
+                                    "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"], 
+                                        unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                )
+                                self.method[scope][method]['modified'] = True
+                            
+                            # Patch field writing, e.g. Store (xxxx, UNIT)
+                            reserve = re.findall("Store \\((\\w+), (.*%s.)%s\\)" % (unit['OR path'].split('.')[-2], unit['name']), 
+                                self.method[scope][method]["content"])
+                            for item in reserve:
+                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                    "Store (%s, %s%s)" % (item[0], item[1], unit['name']),
+                                    "%s%s (0x%X, %s, %s)" % (item[1], unit["write method"], 
+                                        unit["offset"] + OR_info["offset"], unit["size"], item[0])
+                                )
+                                self.method[scope][method]['modified'] = True
+
+                            # Patch field reading, e.g. xxxx = EC0.UNIT
+                            reserve = re.findall("(.*%s\.)%s(.*)" % (unit['OR path'].split('.')[-2], unit['name']), 
+                                self.method[scope][method]['content'])
+                            for i in range(0, len(reserve)):
+                                if "Method (" in reserve[i][0] or "Device (" in reserve[i][0] or "Scope (" in reserve[i][0]:
+                                    continue  # stop patching method that have the same name as fieldunit
+                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                    reserve[i][0]+unit['name']+reserve[i][1], 
+                                    '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'], 
+                                        unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]), 
+                                )
+                                self.method[scope][method]['modified'] = True
+
+    def patch_PTSWAK(self):
+        '''
+        Patch _PTS and _WAK if they are modified.
+        '''
+        PTS_Serialized = 'NotSerialized'
+        WAK_Serialized = 'NotSerialized'
+        TTS_Serialized = 'NotSerialized'
+        method_new = copy.deepcopy(self.method)
+        for scope in self.method:
+            for method in self.method[scope]:
+                if not self.method[scope][method]['modified']:
+                    # skip unmodified method
+                    continue
+                if '_PTS' in method:
+                    method_new[scope]['\\_PTS'] = {'content':self.method[scope][method]['content'].replace('_PTS', 'YPTS'), 'modified':True}
+
+                if '_WAK' in method:
+                    method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'ZWAK'), 'modified':True}
                 
+                if '_TTS' in method:
+                    method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'YWAK'), 'modified':True}
+
+                if '_PTS' in method or '_WAK' in method or '_TTS' in method:
+                    try:
+                        PTS_Serialized = re.search('_PTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
+                    except AttributeError:
+                        pass
+                    try:
+                        WAK_Serialized = re.search('_WAK, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
+                    except AttributeError:
+                        pass
+                    try:
+                        TTS_Serialized = re.search('_TTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
+                    except AttributeError:
+                        pass
+                    PCI9 = '''
+        Device (PCI9)
+        {
+            Name (_ADR, Zero)
+            Name (FNOK, Zero)
+            Name (MODE, Zero)
+            //
+            Name (TPTS, Zero)
+            Name (TWAK, Zero)
+            Method (_STA, 0, NotSerialized)
+            {
+                If (_OSI ("Darwin"))
+                {
+                    Return (0x0F)
+                }
+                Else
+                {
+                    Return (Zero)
+                }
+            }
+        }'''
+                    method_new['\\_SB'] = {'\\_SB.PCI9':{'content':PCI9, 'modified': True}}
+
+                    PTS = '''
+        Method (_PTS, 1, %s) //Method (_PTS, 1, Serialized)
+        {
+            If (_OSI ("Darwin"))
+            {
+                \_SB.PCI9.TPTS = Arg0
+                
+                if(\_SB.PCI9.FNOK ==1)
+                {
+                    Arg0 = 3
+                }
+                
+                If (CondRefOf (\DGPU._ON))
+                {
+                    \DGPU._ON ()
+                }
+                
+                If (CondRefOf(EXT1))
+                {
+                    EXT1(Arg0)
+                }
+                If (CondRefOf(EXT2))
+                {
+                    EXT2(Arg0)
+                }
+            }
+            If (CondRefOf (\YPTS) && _OSI ("Darwin"))
+            {
+                YPTS(Arg0)
+            }
+            Else
+            {
+                XPTS(Arg0)
+            }
+        }''' % PTS_Serialized
+                    if '\\_PTS' in method_new['\\']:
+                        method_new['\\']['\\_PTS']['content'] += PTS
+                        method_new['\\']['\\_PTS']['modified'] = True
+                    else:
+                        method_new['\\']['\\_PTS'] = {'content':PTS, 'modified':True}
+                    
+                    WAK = '''
+        Method (_WAK, 1, %s) //Method (_WAK, 1, Serialized)
+        {
+            If (_OSI ("Darwin"))
+            {
+                \_SB.PCI9.TWAK = Arg0
+                
+                if(\_SB.PCI9.FNOK ==1)
+                {
+                    \_SB.PCI9.FNOK =0
+                    Arg0 = 3
+                }
+
+                If (CondRefOf (\DGPU._OFF))
+                {
+                    \DGPU._OFF ()
+                }
+                
+                If (CondRefOf(EXT3))
+                {
+                    EXT3(Arg0)
+                }
+                If (CondRefOf(EXT4))
+                {
+                    EXT4(Arg0)
+                }
+            }
+            If (CondRefOf (\YWAK) && _OSI ("Darwin"))
+            {
+                Return (YWAK(Arg0))
+            }
+            Else
+            {
+                Return (XWAK(Arg0))
+            }
+        }''' % WAK_Serialized
+                    if '\\_WAK' in method_new['\\']:
+                        method_new['\\']['\\_WAK']['content'] += WAK
+                        method_new['\\']['\\_WAK']['modified'] = True
+                    else:
+                        method_new['\\']['\\_WAK'] = {'content':WAK, 'modified':True}
+
+                    TTS = '''
+        Method (_TTS, 1, %s) //Method (_TTS, 1, Serialized)
+        {
+            If (_OSI ("Darwin"))
+            {
+                If (CondRefOf(EXT5))
+                {
+                    EXT5(Arg0)
+                }
+                If (CondRefOf(EXT6))
+                {
+                    EXT6(Arg0)
+                }
+            }
+
+            If (CondRefOf(XTTS))
+            {
+                XTTS(Arg0)
+            }
+        }''' % TTS_Serialized
+                    if '\\_TTS' in method_new['\\']:
+                        method_new['\\']['\\_TTS']['content'] += TTS
+                        method_new['\\']['\\_TTS']['modified'] = True
+                    else:
+                        method_new['\\']['\\_TTS'] = {'content':TTS, 'modified':True}
+
+        self.method = method_new
+        del method_new
 
 
     def insert_osi(self):
@@ -319,8 +527,10 @@ class AutoGen:
         '''
         for scope in self.method:
             for method in self.method[scope]:
-                if not self.method[scope][method]:
-                    # Skip deleted method
+                if not self.method[scope][method]['modified']:
+                    # skip unmodified method
+                    continue
+                if 'Darwin' in self.method[scope][method]["content"]:
                     continue
                 stack = []
                 method_info = re.search(
@@ -350,23 +560,6 @@ class AutoGen:
                                 "}\n        Else\n        {\n            Return(X%s(%s))\n        }\n" % (
                                 method_info[0][-3:], arg) + self.method[scope][method]["content"][index:]
                             break
-
-                stack = []
-                splited = self.method[scope][method]["content"].split('\n')
-                # Parse line by line
-                for index in range(0, len(splited)):
-                    # Delete space at front of each line
-                    splited[index] = splited[index].strip()
-                    if '}' in splited[index]:
-                        if '{' not in splited[index]:
-                            stack.pop()
-                    # Indent by brackets
-                    splited[index] = "    " * (len(stack) + 2) + splited[index]
-                    if '{' in splited[index]:
-                        if '}' not in splited[index]:
-                            stack.append('{')
-
-                self.method[scope][method]["content"] = '\n'.join(splited)
 
     def special_devices(self):
         '''
@@ -429,11 +622,15 @@ class AutoGen:
         # generate ACPI patch
         for scope in self.method:
             for method in self.method[scope]:
-                if not self.method[scope][method]:
-                    # Skip deleted method
+                if not self.method[scope][method]['modified']:
+                    # Skip unmodified method
                     continue
-                method_info = list(re.search("Method \((.*?), (\d+?), (Serialized|NotSerialized)\)", 
-                    self.method[scope][method]["content"]).groups())
+                method_name = re.split(r'[\.\\]', method)[-1]
+                try:
+                    method_info = list(re.search("Method \((%s), (\d+?), (Serialized|NotSerialized)\)" % method_name, 
+                        self.method[scope][method]["content"]).groups())
+                except AttributeError:
+                    continue
                 method_info[0] = method_info[0].replace("\\", "")
                 if method_info[0] in dangerous_patch_list:
                     # Warning user if this tool patched some dangerous methods
@@ -475,12 +672,32 @@ class AutoGen:
                 continue
             self.file_generated += "    Scope (%s)\n    {\n" % scope
             for method in self.method[scope]:
-                if not self.method[scope][method]:
-                    # Skip deleted method
+                if not self.method[scope][method]['modified']:
+                    # Skip unmodified method
                     continue
                 self.file_generated += self.method[scope][method]["content"] + '\n'
             self.file_generated += "    }\n"
         self.file_generated += '}\n'
+
+    def re_indent(self):
+        stack = []
+        splited = self.file_generated.split('\n')
+        # Parse line by line
+        for index in range(0, len(splited)):
+            # Delete space at front of each line
+            splited[index] = splited[index].strip()
+            count = splited[index].count('{')
+            count -= splited[index].count('}')
+            if count < 0:
+                for i in range(0, -count):
+                    stack.pop()
+            # Indent by brackets
+            splited[index] = "    " * len(stack) + splited[index]
+            if count > 0:
+                for i in range(0, count):
+                    stack.append('{')
+
+        self.file_generated = '\n'.join(splited)
 
     def write_file(self):
         '''
@@ -517,17 +734,39 @@ class AutoGen:
         if os.path.exists('./iasl') and os.sys.platform == "darwin":
             with os.popen("./iasl -va -f %s 2>&1" % out_path) as p:
                 ret = p.read()
-                print(ret)
+                if "AML Output" in ret:
+                    ret_spl = ret.splitlines()
+                    for line in ret_spl:
+                        if line.startswith("AML Output"):
+                            if '0 bytes' not in line:
+                                print(COMPILE_SUCCESS_MSG)
+                                break
+                            else:
+                                print(COMPILE_FAILED_ERR)
+                else:
+                    print(COMPILE_FAILED_ERR)
         elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
             with os.popen(".\\iasl.exe -va -f %s" % out_path) as p:
                 ret = p.read()
                 if "AML Output" in ret:
-                    print(COMPILE_SUCCESS_MSG)
+                    ret_spl = ret.splitlines()
+                    for line in ret_spl:
+                        if line.startswith("AML Output"):
+                            if '0 bytes' not in line:
+                                print(COMPILE_SUCCESS_MSG)
+                                break
+                            else:
+                                print(COMPILE_FAILED_ERR)
                 else:
-                    print(ret)
+                    print(COMPILE_FAILED_ERR)
         else:
             print(TRY_TO_COMPILE_ANYWAY)
             os.system('iasl -va -f %s' % out_path)
+
+        if os.sys.platform == "darwin":
+            os.system("open ~/Desktop/Battery_hotpatch")
+        elif os.sys.platform == "win32":
+            os.system("start ~\\Desktop\\Battery_hotpatch")
 
 def opener(filepath:str):
     try:
@@ -572,7 +811,7 @@ def parse_args():
             dsdt_content = opener(filepath=filepath)
         if '.aml' in arg:
             if os.path.exists('./iasl') and os.sys.platform == "darwin":
-                with os.popen("./iasl %s 2>&1" % arg) as p:
+                with os.popen("./iasl '%s' 2>&1" % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
                         print(DECOMPILE_SUCCESS_MSG)
@@ -580,7 +819,7 @@ def parse_args():
                         print(ret)
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-                with os.popen(".\\iasl.exe %s" % arg) as p:
+                with os.popen(".\\iasl.exe '%s'" % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
                         print(DECOMPILE_SUCCESS_MSG)
