@@ -367,7 +367,7 @@ class AutoGen:
                     method_new[scope]['\\_PTS'] = {'content':self.method[scope][method]['content'].replace('_PTS', 'YPTS'), 'modified':True}
 
                 if '_WAK' in method:
-                    method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'ZWAK'), 'modified':True}
+                    method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'YWAK'), 'modified':True}
                 
                 if '_TTS' in method:
                     method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'YWAK'), 'modified':True}
@@ -436,11 +436,11 @@ class AutoGen:
             }
             If (CondRefOf (\YPTS) && _OSI ("Darwin"))
             {
-                YPTS(Arg0)
+                \YPTS(Arg0)
             }
             Else
             {
-                XPTS(Arg0)
+                \XPTS(Arg0)
             }
         }''' % PTS_Serialized
                     if '\\_PTS' in method_new['\\']:
@@ -478,11 +478,11 @@ class AutoGen:
             }
             If (CondRefOf (\YWAK) && _OSI ("Darwin"))
             {
-                Return (YWAK(Arg0))
+                Return (\YWAK(Arg0))
             }
             Else
             {
-                Return (XWAK(Arg0))
+                Return (\XWAK(Arg0))
             }
         }''' % WAK_Serialized
                     if '\\_WAK' in method_new['\\']:
@@ -506,9 +506,9 @@ class AutoGen:
                 }
             }
 
-            If (CondRefOf(XTTS))
+            If (CondRefOf(\XTTS))
             {
-                XTTS(Arg0)
+                \XTTS(Arg0)
             }
         }''' % TTS_Serialized
                     if '\\_TTS' in method_new['\\']:
