@@ -36,7 +36,11 @@ TRY_TO_COMPILE_ANYWAY = '\033[1;36miasl compiler not found in working directory,
 DANGEROUS_PATCH_MSG = ['\033[1;31mThis patch includes dangerous binary patch: ', '->', ' You should review it before apply!!\n(Use Hex Fiend to extend the heximal code, make sure it\'s unique in whole DSDT.aml)\033[0m']
 NO_IASL_COMPILER = '\033[1;36miasl compiler not found in working directory, aborting.\033[0m'
 
-LANG = os.environ.get('LANG').split('.')[0]
+try:
+    LANG = os.environ.get('LANG').split('.')[0]
+except:
+    LANG = 'en_US'
+
 if LANG == "zh_CN":
     HELP_MESSAGE = '''
 一个自动从 DSDT 中生成 SSDT-BATT 的 python 脚本
@@ -47,7 +51,7 @@ Copyright (c) 2020 郭耀铭 All Rights Reserved.
 
 \033[4m推荐使用 pypy3 以获得更好的性能\033[0m
 
-用法: 
+用法:
     python3 Auto_Gen.py [options] <DSDT.dsl>
 
 或
