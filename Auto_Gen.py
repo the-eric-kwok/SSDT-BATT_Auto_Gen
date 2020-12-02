@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from os import replace
 import sys
 import os
 import re
@@ -276,47 +277,62 @@ class AutoGen:
             # Patching method
             for scope in self.method:
                 for method in self.method[scope]:
+                    lines = self.method[scope][method]["content"].splitlines()
                     if VERBOSE:
                         print("\n%s\n| Patching: %s |\n%s" % (
                             '='*(14+len(method)), method, '='*(14+len(method))))
                     for unit in OR_info["field_unit"]:
                         if VERBOSE:
                             print("Parsing", unit)
-                        if scope == '.'.join(unit['OR path'].split('.')[:-1]):
+                        unit_path = '.'.join(unit['OR path'].split('.')[:-1])
+                        if scope == unit_path:
                             # Patch field writing, e.g. UNIT = xxxx
                             reserve = re.findall(
                                 "([^\.])%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
                             for item in reserve:
-                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "%s%s = %s" % (
-                                        item[0], unit['name'], item[1]),
-                                    "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
-                                                             unit["offset"] + OR_info["offset"], unit["size"], item[1])
-                                )
+                                for line in lines:
+                                    target = "%s%s = %s" % (
+                                        item[0], unit['name'], item[1])
+                                    if target in line:
+                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
+                                                                           unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field writing, e.g. Store (xxxx, UNIT)
                             reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'],
                                                  self.method[scope][method]["content"])
                             for item in reserve:
-                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "Store (%s, %s)" % (item, unit['name']),
-                                    "%s (0x%X, %s, %s)" % (unit["write method"],
-                                                           unit["offset"] + OR_info["offset"], unit["size"], item)
-                                )
+                                for line in lines:
+                                    target = "Store (%s, %s)" % (
+                                        item, unit['name'])
+                                    if target in line:
+                                        replace = "%s (0x%X, %s, %s)" % (unit["write method"],
+                                                                         unit["offset"] + OR_info["offset"], unit["size"], item)
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = UNIT
                             reserve = re.findall("(.*[^\.])%s(.*)" % unit['name'],
                                                  self.method[scope][method]['content'])
-                            for i in range(0, len(reserve)):
-                                if "Method (" in reserve[i][0] or "Device (" in reserve[i][0] or "Scope (" in reserve[i][0]:
+                            for item in reserve:
+                                if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
                                     continue  # stop patching method that have the same name as fieldunit
-                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    reserve[i][0]+unit['name']+reserve[i][1],
-                                    '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'],
-                                                           unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]),
-                                )
+                                for line in lines:
+                                    target = item[0] + unit['name'] + item[1]
+                                    if target in line:
+                                        replace = '%s%s (0x%X, %s)%s' % (item[0], unit['read method'],
+                                                                         unit['offset'] + OR_info["offset"], unit['size'], item[1])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
                                 self.method[scope][method]['modified'] = True
 
                         else:
@@ -324,37 +340,49 @@ class AutoGen:
                             reserve = re.findall("(.*%s\.)%s = (\\w+)" % (unit['OR path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]["content"])
                             for item in reserve:
-                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "%s%s = %s" % (
-                                        item[0], unit['name'], item[1]),
-                                    "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
-                                                             unit["offset"] + OR_info["offset"], unit["size"], item[1])
-                                )
+                                for line in lines:
+                                    target = "%s%s = %s" % (
+                                        item[0], unit['name'], item[1])
+                                    if target in line:
+                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
+                                                                           unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field writing, e.g. Store (xxxx, UNIT)
                             reserve = re.findall("Store \\((\\w+), (.*%s.)%s\\)" % (unit['OR path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]["content"])
                             for item in reserve:
-                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "Store (%s, %s%s)" % (
-                                        item[0], item[1], unit['name']),
-                                    "%s%s (0x%X, %s, %s)" % (item[1], unit["write method"],
-                                                             unit["offset"] + OR_info["offset"], unit["size"], item[0])
-                                )
+                                for line in lines:
+                                    target = "Store (%s, %s%s)" % (
+                                        item[0], item[1], unit['name'])
+                                    if target in line:
+                                        replace = "%s%s (0x%X, %s, %s)" % (item[1], unit["write method"],
+                                                                           unit["offset"] + OR_info["offset"], unit["size"], item[0])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = EC0.UNIT
                             reserve = re.findall("(.*%s\.)%s(.*)" % (unit['OR path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]['content'])
-                            for i in range(0, len(reserve)):
-                                if "Method (" in reserve[i][0] or "Device (" in reserve[i][0] or "Scope (" in reserve[i][0]:
-                                    continue  # stop patching method that have the same name as fieldunit
-                                self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    reserve[i][0]+unit['name']+reserve[i][1],
-                                    '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'],
-                                                           unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]),
-                                )
+                            for item in reserve:
+                                for line in lines:
+                                    if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
+                                        continue  # stop patching method that have the same name as fieldunit
+                                    target = item[0] + unit['name'] + item[1]
+                                    if target in line:
+                                        replace = '%s%s (0x%X, %s)%s' % (item[0], unit['read method'],
+                                                                         unit['offset'] + OR_info["offset"], unit['size'], item[1])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
                                 self.method[scope][method]['modified'] = True
 
     def patch_PTSWAK(self):
@@ -618,8 +646,10 @@ class AutoGen:
 
     def generate_comment(self):
         # Find mutex and set them to zero
+        self.patch_list = []
         mutex = re.findall("Mutex \((.*?), (.*?)\)", self.dsdt_content)
         for item in mutex:
+            patch = {}
             name = item[0]
             value = int(item[1], 16)
             find = replace = '01'
@@ -630,11 +660,10 @@ class AutoGen:
                     replace += "%02X" % asc
                 find += "%02X" % value
                 replace += "00"
-                self.comment += '''// Set mutex %s to zero
-// Find:    %s
-// Replace: %s
-
-''' % (name, find, replace)
+                patch['comment'] = '[BATT] Set mutex %s to zero' % name
+                patch['find'] = find
+                patch['replace'] = replace
+                self.patch_list.append(patch)
 
         # generate ACPI patch
         for scope in self.method:
@@ -642,6 +671,7 @@ class AutoGen:
                 if not self.method[scope][method]['modified']:
                     # Skip unmodified method
                     continue
+                patch = {}
                 method_name = re.split(r'[\.\\]', method)[-1]
                 try:
                     method_info = list(re.search("Method \((%s), (\d+?), (Serialized|NotSerialized)\)" % method_name,
@@ -664,13 +694,26 @@ class AutoGen:
                 replace = "58" + replace[2:]  # Set the 1st character to 'X'
                 find += "%02X" % method_info[1]
                 replace += "%02X" % method_info[1]
-                self.comment += '''// Rename %s to X%s
-// Find:    %s
-// Replace: %s
+                patch['comment'] = '[BATT] Rename %s to X%s' % (
+                    method_info[0], method_info[0][1:])
+                patch['find'] = find
+                patch['replace'] = replace
+                self.patch_list.append(patch)
 
-''' % (method_info[0], method_info[0][1:], find, replace)
-
-        # TODO generate FieldUnit indicator by searching their Read method and offset
+        # Add comment before dsl file
+        self.comment += '/*\n'
+        self.comment += '* This battery hot patch is generate by SSDT-BATT_Auto_Gen, \n'
+        self.comment += '* which is a python program written by Eric Kwok.\n'
+        self.comment += '*\n'
+        self.comment += '* Note: Should be compile with -f option.\n'
+        self.comment += '* For any support, plese visit https://github.com/the-eric-kwok/SSDT-BATT_Auto_Gen/issues\n'
+        self.comment += '*\n'
+        for patch in self.patch_list:
+            self.comment += '* %s\n' % patch['comment']
+            self.comment += '* Find:    %s\n' % patch['find']
+            self.comment += '* Replace: %s\n' % patch['replace']
+            self.comment += '*\n'
+        self.comment += '*/\n'
 
     def assemble(self):
         '''
@@ -833,7 +876,7 @@ def parse_args():
             dsdt_content = opener(filepath=filepath)
         if '.aml' in arg:
             if os.path.exists('./iasl') and os.sys.platform == "darwin":
-                print("file: "+arg)
+                #print("file: "+arg)
                 with os.popen('./iasl "%s" 2>&1' % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
@@ -842,7 +885,7 @@ def parse_args():
                         print(ret)
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-                print("file: "+arg)
+                #print("file: "+arg)
                 with os.popen('.\\iasl.exe "%s" 2>&1' % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
