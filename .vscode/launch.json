@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug",
-                "Sample/DSDT-Acel_A715-73G.dsl"
+                "Sample/DSDT_HP-Pavillion-15.dsl"
             ]
         }
     ]

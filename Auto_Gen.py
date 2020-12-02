@@ -10,10 +10,11 @@ import get_content
 import copy
 
 dangerous_patch_list = ['_STA', '_CRS', '_REG', '_ADR', '_PRW', '_DCS', '_DGS', '_DSS', '_INI', '_PS0', '_PS1',
-    '_PS2', '_PS3', '_PS4', '_PS5', '_S0D', '_S1D', '_S2D', '_S3D', '_S4D', '_S5D']
+                        '_PS2', '_PS3', '_PS4', '_PS5', '_S0D', '_S1D', '_S2D', '_S3D', '_S4D', '_S5D']
 VERBOSE = False
 DEBUG = False
 FORCE = False
+
 
 class AutoGen:
     OR_info = []
@@ -24,7 +25,7 @@ class AutoGen:
     RW_method = ""
     comment = ""
 
-    def __init__(self, dsdt_content:str, filepath:str) -> None:
+    def __init__(self, dsdt_content: str, filepath: str) -> None:
         self.dsdt_content = dsdt_content
         self.filepath = filepath
         self.clean_out()
@@ -51,7 +52,8 @@ class AutoGen:
         # Remove line comments
         self.dsdt_content = re.sub(r'//.*', '', self.dsdt_content)
         # Remove "External" declaration
-        self.dsdt_content = re.sub(r'External \(.*Obj\)\n', "", self.dsdt_content)
+        self.dsdt_content = re.sub(
+            r'External \(.*Obj\)\n', "", self.dsdt_content)
         # Remove "Firmware Error" that generated within disassambling
         self.dsdt_content = re.sub(
             r'Firmware Error.*\n', "", self.dsdt_content)
@@ -70,7 +72,6 @@ class AutoGen:
                 i = length - i - 1
                 if self.dsdt_splited[i] == '':
                     del self.dsdt_splited[i]
-
 
     def find_OperationRegion(self):
         '''
@@ -234,8 +235,8 @@ class AutoGen:
         }
     }
 ''' % (OR_info["path"], self.RE1B, self.ERM2, OR_info["storage"],
-            self.ERM2, self.RECB, self.RE1B, self.WE1B, self.ERM2,
-            OR_info["storage"], self.ERM2, self.WECB, self.WE1B)
+                            self.ERM2, self.RECB, self.RE1B, self.WE1B, self.ERM2,
+                            OR_info["storage"], self.ERM2, self.WECB, self.WE1B)
         if "RECB" not in self.RW_method:
             print(NOT_NEED_TO_PATCH_MSG)
             exit(0)
@@ -269,84 +270,90 @@ class AutoGen:
                             continue
                     if scope not in self.method:
                         self.method[scope] = {}
-                    self.method[scope][name] = {"content":result[name], "modified":False}
+                    self.method[scope][name] = {
+                        "content": result[name], "modified": False}
 
             # Patching method
             for scope in self.method:
                 for method in self.method[scope]:
                     if VERBOSE:
-                        print("\n%s\n| Patching: %s |\n%s" % ('='*(14+len(method)), method, '='*(14+len(method))))
+                        print("\n%s\n| Patching: %s |\n%s" % (
+                            '='*(14+len(method)), method, '='*(14+len(method))))
                     for unit in OR_info["field_unit"]:
                         if VERBOSE:
                             print("Parsing", unit)
                         if scope == '.'.join(unit['OR path'].split('.')[:-1]):
                             # Patch field writing, e.g. UNIT = xxxx
-                            reserve = re.findall("([^\.])%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
+                            reserve = re.findall(
+                                "([^\.])%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
                             for item in reserve:
                                 self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "%s%s = %s" % (item[0], unit['name'], item[1]),
+                                    "%s%s = %s" % (
+                                        item[0], unit['name'], item[1]),
                                     "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
-                                        unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                                             unit["offset"] + OR_info["offset"], unit["size"], item[1])
                                 )
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field writing, e.g. Store (xxxx, UNIT)
                             reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'],
-                                self.method[scope][method]["content"])
+                                                 self.method[scope][method]["content"])
                             for item in reserve:
                                 self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
                                     "Store (%s, %s)" % (item, unit['name']),
                                     "%s (0x%X, %s, %s)" % (unit["write method"],
-                                        unit["offset"] + OR_info["offset"], unit["size"], item)
+                                                           unit["offset"] + OR_info["offset"], unit["size"], item)
                                 )
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = UNIT
                             reserve = re.findall("(.*[^\.])%s(.*)" % unit['name'],
-                                self.method[scope][method]['content'])
+                                                 self.method[scope][method]['content'])
                             for i in range(0, len(reserve)):
                                 if "Method (" in reserve[i][0] or "Device (" in reserve[i][0] or "Scope (" in reserve[i][0]:
                                     continue  # stop patching method that have the same name as fieldunit
                                 self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
                                     reserve[i][0]+unit['name']+reserve[i][1],
                                     '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'],
-                                        unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]),
+                                                           unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]),
                                 )
                                 self.method[scope][method]['modified'] = True
 
                         else:
                             # Patch field writing, e.g. EC0.UNIT = xxxx
                             reserve = re.findall("(.*%s\.)%s = (\\w+)" % (unit['OR path'].split('.')[-2], unit['name']),
-                                self.method[scope][method]["content"])
+                                                 self.method[scope][method]["content"])
                             for item in reserve:
                                 self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "%s%s = %s" % (item[0], unit['name'], item[1]),
+                                    "%s%s = %s" % (
+                                        item[0], unit['name'], item[1]),
                                     "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
-                                        unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                                             unit["offset"] + OR_info["offset"], unit["size"], item[1])
                                 )
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field writing, e.g. Store (xxxx, UNIT)
                             reserve = re.findall("Store \\((\\w+), (.*%s.)%s\\)" % (unit['OR path'].split('.')[-2], unit['name']),
-                                self.method[scope][method]["content"])
+                                                 self.method[scope][method]["content"])
                             for item in reserve:
                                 self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                    "Store (%s, %s%s)" % (item[0], item[1], unit['name']),
+                                    "Store (%s, %s%s)" % (
+                                        item[0], item[1], unit['name']),
                                     "%s%s (0x%X, %s, %s)" % (item[1], unit["write method"],
-                                        unit["offset"] + OR_info["offset"], unit["size"], item[0])
+                                                             unit["offset"] + OR_info["offset"], unit["size"], item[0])
                                 )
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = EC0.UNIT
                             reserve = re.findall("(.*%s\.)%s(.*)" % (unit['OR path'].split('.')[-2], unit['name']),
-                                self.method[scope][method]['content'])
+                                                 self.method[scope][method]['content'])
                             for i in range(0, len(reserve)):
                                 if "Method (" in reserve[i][0] or "Device (" in reserve[i][0] or "Scope (" in reserve[i][0]:
                                     continue  # stop patching method that have the same name as fieldunit
                                 self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
                                     reserve[i][0]+unit['name']+reserve[i][1],
                                     '%s%s (0x%X, %s)%s' % (reserve[i][0], unit['read method'],
-                                        unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]),
+                                                           unit['offset'] + OR_info["offset"], unit['size'], reserve[i][1]),
                                 )
                                 self.method[scope][method]['modified'] = True
 
@@ -364,25 +371,31 @@ class AutoGen:
                     # skip unmodified method
                     continue
                 if '_PTS' in method:
-                    method_new[scope]['\\_PTS'] = {'content':self.method[scope][method]['content'].replace('_PTS', 'YPTS'), 'modified':True}
+                    method_new[scope]['\\_PTS'] = {'content': self.method[scope][method]['content'].replace(
+                        '_PTS', 'YPTS'), 'modified': True}
 
                 if '_WAK' in method:
-                    method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'YWAK'), 'modified':True}
+                    method_new[scope]['\\_WAK'] = {'content': self.method[scope][method]['content'].replace(
+                        '_WAK', 'YWAK'), 'modified': True}
 
                 if '_TTS' in method:
-                    method_new[scope]['\\_WAK'] = {'content':self.method[scope][method]['content'].replace('_WAK', 'YWAK'), 'modified':True}
+                    method_new[scope]['\\_WAK'] = {'content': self.method[scope][method]['content'].replace(
+                        '_WAK', 'YWAK'), 'modified': True}
 
                 if '_PTS' in method or '_WAK' in method or '_TTS' in method:
                     try:
-                        PTS_Serialized = re.search('_PTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
+                        PTS_Serialized = re.search(
+                            '_PTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
                     except AttributeError:
                         pass
                     try:
-                        WAK_Serialized = re.search('_WAK, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
+                        WAK_Serialized = re.search(
+                            '_WAK, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
                     except AttributeError:
                         pass
                     try:
-                        TTS_Serialized = re.search('_TTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
+                        TTS_Serialized = re.search(
+                            '_TTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
                     except AttributeError:
                         pass
                     PCI9 = '''
@@ -406,7 +419,8 @@ class AutoGen:
                 }
             }
         }'''
-                    method_new['\\_SB'] = {'\\_SB.PCI9':{'content':PCI9, 'modified': True}}
+                    method_new['\\_SB'] = {'\\_SB.PCI9': {
+                        'content': PCI9, 'modified': True}}
 
                     PTS = '''
         Method (_PTS, 1, %s) //Method (_PTS, 1, Serialized)
@@ -447,7 +461,8 @@ class AutoGen:
                         method_new['\\']['\\_PTS']['content'] += PTS
                         method_new['\\']['\\_PTS']['modified'] = True
                     else:
-                        method_new['\\']['\\_PTS'] = {'content':PTS, 'modified':True}
+                        method_new['\\']['\\_PTS'] = {
+                            'content': PTS, 'modified': True}
 
                     WAK = '''
         Method (_WAK, 1, %s) //Method (_WAK, 1, Serialized)
@@ -489,7 +504,8 @@ class AutoGen:
                         method_new['\\']['\\_WAK']['content'] += WAK
                         method_new['\\']['\\_WAK']['modified'] = True
                     else:
-                        method_new['\\']['\\_WAK'] = {'content':WAK, 'modified':True}
+                        method_new['\\']['\\_WAK'] = {
+                            'content': WAK, 'modified': True}
 
                     TTS = '''
         Method (_TTS, 1, %s) //Method (_TTS, 1, Serialized)
@@ -515,11 +531,11 @@ class AutoGen:
                         method_new['\\']['\\_TTS']['content'] += TTS
                         method_new['\\']['\\_TTS']['modified'] = True
                     else:
-                        method_new['\\']['\\_TTS'] = {'content':TTS, 'modified':True}
+                        method_new['\\']['\\_TTS'] = {
+                            'content': TTS, 'modified': True}
 
         self.method = method_new
         del method_new
-
 
     def insert_osi(self):
         '''
@@ -541,7 +557,7 @@ class AutoGen:
                 self.method[scope][method]["content"] = re.sub(
                     'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)',
                     "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
-                    method_info[0], method_info[1], method_info[2]),
+                        method_info[0], method_info[1], method_info[2]),
                     self.method[scope][method]["content"])
 
                 for index in range(0, len(self.method[scope][method]["content"])):
@@ -566,6 +582,7 @@ class AutoGen:
         This method automatically patch some special laptops. For example, some HP laptop have ACEL device,
         which will cause battery info not able to be updated.
         '''
+
         def patch_ACEL(self):
             '''
             Disable HP laptops' ACEL device
@@ -575,8 +592,8 @@ class AutoGen:
             for dev in content:
                 if dev not in self.method:
                     self.method[dev] = {}
-                self.method[dev]["%s._STA"%dev] = {
-                    'content':'''        Method (_STA, 0, NotSerialized)
+                self.method[dev]["%s._STA" % dev] = {
+                    'content': '''        Method (_STA, 0, NotSerialized)
             {
                 If (_OSI("Darwin"))
                 {
@@ -588,7 +605,7 @@ class AutoGen:
                 }
             }
     ''',
-                    'modified':True
+                    'modified': True
                 }
 
         if "Device (ACEL)" in self.dsdt_content:
@@ -628,14 +645,14 @@ class AutoGen:
                 method_name = re.split(r'[\.\\]', method)[-1]
                 try:
                     method_info = list(re.search("Method \((%s), (\d+?), (Serialized|NotSerialized)\)" % method_name,
-                        self.method[scope][method]["content"]).groups())
+                                                 self.method[scope][method]["content"]).groups())
                 except AttributeError:
                     continue
                 method_info[0] = method_info[0].replace("\\", "")
                 if method_info[0] in dangerous_patch_list:
                     # Warning user if this tool patched some dangerous methods
                     print(DANGEROUS_PATCH_MSG[0], method_info[0], DANGEROUS_PATCH_MSG[1],
-                        'X%s' % method_info[0][1:], DANGEROUS_PATCH_MSG[2])
+                          'X%s' % method_info[0][1:], DANGEROUS_PATCH_MSG[2])
                 method_info[1] = int(method_info[1])
                 if method_info[2] == 'Serialized':
                     method_info[1] += 8
@@ -654,7 +671,6 @@ class AutoGen:
 ''' % (method_info[0], method_info[0][1:], find, replace)
 
         # TODO generate FieldUnit indicator by searching their Read method and offset
-
 
     def assemble(self):
         '''
@@ -704,9 +720,11 @@ class AutoGen:
         Write to dsl file, and also try to compile it automatically.
         '''
         out_path = []
-        out_path.append(os.path.expanduser('~') + os.sep + 'Desktop' + os.sep + 'Battery_hotpatch')
+        out_path.append(os.path.expanduser('~') + os.sep +
+                        'Desktop' + os.sep + 'Battery_hotpatch')
         # Replace DSDT with SSDT-BATT and fill it in filename
-        out_path.append(os.path.split(self.filepath.replace("DSDT", "SSDT-BATT"))[1])
+        out_path.append(os.path.split(
+            self.filepath.replace("DSDT", "SSDT-BATT"))[1])
         # Replace dsdt with SSDT-BATT in filename
         out_path[1] = out_path[1].replace("dsdt", "SSDT-BATT")
 
@@ -714,25 +732,26 @@ class AutoGen:
             # If directory not exists
             os.makedirs(out_path[0])
 
-        out_path = os.sep.join(out_path)
+        out_file = os.sep.join(out_path)
+        out_path = out_path[0]
         try:
-            with open(out_path, 'x') as f:
+            with open(out_file, 'x') as f:
                 f.write(self.file_generated)
                 print(GENERATE_SUCCESSFUL_MSG)
         except FileExistsError:
             for i in range(1, 100):
-                test = '.'.join(out_path.split('.')[:-1]) + '_%d.dsl' % i
+                test = '.'.join(out_file.split('.')[:-1]) + '_%d.dsl' % i
                 try:
                     with open(test, 'x') as f:
                         f.write(self.file_generated)
-                        out_path = self.out_path = test
+                        out_file = test
                         print(GENERATE_SUCCESSFUL_MSG)
                     break
                 except FileExistsError:
                     pass
 
         if os.path.exists('./iasl') and os.sys.platform == "darwin":
-            with os.popen("./iasl -va -f %s 2>&1" % out_path) as p:
+            with os.popen("./iasl -va -f %s 2>&1" % out_file) as p:
                 ret = p.read()
                 if "AML Output" in ret:
                     ret_spl = ret.splitlines()
@@ -746,7 +765,7 @@ class AutoGen:
                 else:
                     print(COMPILE_FAILED_ERR)
         elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-            with os.popen(".\\iasl.exe -va -f %s" % out_path) as p:
+            with os.popen(".\\iasl.exe -va -f %s" % out_file) as p:
                 ret = p.read()
                 if "AML Output" in ret:
                     ret_spl = ret.splitlines()
@@ -761,14 +780,15 @@ class AutoGen:
                     print(COMPILE_FAILED_ERR)
         else:
             print(TRY_TO_COMPILE_ANYWAY)
-            os.system('iasl -va -f %s' % out_path)
+            os.system('iasl -va -f %s' % out_file)
 
         if os.sys.platform == "darwin":
             os.system("open " + out_path)
         elif os.sys.platform == "win32":
             os.system("start " + out_path)
 
-def opener(filepath:str):
+
+def opener(filepath: str):
     try:
         with open(filepath, 'r') as f:
             content = f.read()
@@ -780,9 +800,11 @@ def opener(filepath:str):
         exit(1)
     return content
 
+
 def show_help():
     print(HELP_MESSAGE)
     exit()
+
 
 def parse_args():
     '''
@@ -811,7 +833,8 @@ def parse_args():
             dsdt_content = opener(filepath=filepath)
         if '.aml' in arg:
             if os.path.exists('./iasl') and os.sys.platform == "darwin":
-                with os.popen("./iasl '%s' 2>&1" % arg) as p:
+                print("file: "+arg)
+                with os.popen('./iasl "%s" 2>&1' % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
                         print(DECOMPILE_SUCCESS_MSG)
@@ -819,7 +842,8 @@ def parse_args():
                         print(ret)
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-                with os.popen(".\\iasl.exe '%s'" % arg) as p:
+                print("file: "+arg)
+                with os.popen('.\\iasl.exe "%s" 2>&1' % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
                         print(DECOMPILE_SUCCESS_MSG)
@@ -836,6 +860,7 @@ def parse_args():
         return (filepath, dsdt_content)
     else:
         show_help()
+
 
 if __name__ == '__main__':
     start_time = time.time()

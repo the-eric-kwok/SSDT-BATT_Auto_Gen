@@ -23,9 +23,9 @@
 - [x] 同一个 Scope 的方法合并
 - [x] Mutex 置零补丁生成
 - [x] 重命名补丁生成
-- [ ] 手动输入机型
 - [x] 生成产品在桌面
 - [x] Field 名字只有三个字母的时候报“无需patch”，如 Sample/DSDT.dsl
+- [ ] 智能识别 clover 和 OC，并注入 plist 文件
 - [ ] 16 位变量拆分
 - [ ] 16 位使用 B1B2 读取
 - [ ] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）

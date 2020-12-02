@@ -1,4 +1,4 @@
-import os
+import locale
 
 HELP_MESSAGE = '''
 A python script to extract SSDT-BATT battery hotpatch from DSDT.
@@ -26,18 +26,19 @@ OR_NOT_FOUND_ERR = '\033[1;31mCannot found any OperationRegion from EC device. I
 FIELD_UNIT_OFFSET_ERR = "\033[1;31mSome Field Units that needed to be patch cannot be devided by 8 excaly. It seems like your DSDT is being modified uncorrectlly, please re-dump DSDT.\033[0m"
 TOO_MANY_BATT_ERR = "\033[1;31mToo many battery devices! Dual battery patch is not implemented!\033[0m"
 TOO_FEW_BATT_ERR = "\033[1;31mToo few battery devices! Is this desktop computer?\033[0m"
-GENERATE_SUCCESSFUL_MSG = "\033[1;36mSuccessfully generated battery hot-patch.033[0m"
+GENERATE_SUCCESSFUL_MSG = "\033[1;36mSuccessfully generated battery hot-patch.\033[0m"
 NOT_NEED_TO_PATCH_MSG = '\033[1;36mThis DSDT does not need to be patched! Drop SMCBatteryManager.kext and enjoy!\033[0m'
 IS_THIS_HP_LAPTOP = '\033[1;36mI see ACEL device in this DSDT, is this HP laptop? (yes/no)\033[0m'
 COMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully compiled!\033[0m'
 COMPILE_FAILED_ERR = '\033[1;31mCompile failed! Please check and correct dsl file and compile it yourself.\033[0m'
 DECOMPILE_SUCCESS_MSG = '\033[1;36mSuccessfully decompiled!\033[0m'
 TRY_TO_COMPILE_ANYWAY = '\033[1;36miasl compiler not found in working directory, trying to compile anyway.\nIf you didn\'t found .aml file under ./Product folder, you should compile the .dsl file using -f (force) option\033[0m'
-DANGEROUS_PATCH_MSG = ['\033[1;31mThis patch includes dangerous binary patch: ', '->', ' You should review it before apply!!\n(Use Hex Fiend to extend the heximal code, make sure it\'s unique in whole DSDT.aml)\033[0m']
+DANGEROUS_PATCH_MSG = ['\033[1;31mThis patch includes dangerous binary patch: ', '->',
+                       ' You should review it before apply!!\n(Use Hex Fiend to extend the heximal code, make sure it\'s unique in whole DSDT.aml)\033[0m']
 NO_IASL_COMPILER = '\033[1;36miasl compiler not found in working directory, aborting.\033[0m'
 
 try:
-    LANG = os.environ.get('LANG').split('.')[0]
+    LANG = locale.getdefaultlocale()[0]
 except:
     LANG = 'en_US'
 
@@ -78,6 +79,6 @@ Options:
     COMPILE_FAILED_ERR = '\033[1;31m编译出错，请检查dsl文件并尝试手动编译！\033[0m'
     DECOMPILE_SUCCESS_MSG = '\033[1;36m成功反编译！\033[0m'
     TRY_TO_COMPILE_ANYWAY = '\033[1;36m我在当前目录下没找到 iasl 编译器，不过无论如何我还是尝试为您编译\n如果您没有看到 .aml 文件，您应该使用 -f (强制) 选项手动编译 dsl 文件\033[0m'
-    DANGEROUS_PATCH_MSG = ['\033[1;31m这个补丁包含了危险的二进制更名：', '->', ' 您应该自行制作此更名补丁\n（使用 Hex Fiend 工具延长十六进制片段，以确保其唯一性）\033[0m']
+    DANGEROUS_PATCH_MSG = ['\033[1;31m这个补丁包含了危险的二进制更名：', '->',
+                           ' 您应该自行制作此更名补丁\n（使用 Hex Fiend 工具延长十六进制片段，以确保其唯一性）\033[0m']
     NO_IASL_COMPILER = '\033[1;36m当前目录下找不到 iasl 编译器，中止。\033[0m'
-
