@@ -764,10 +764,9 @@ class AutoGen:
             os.system('iasl -va -f %s' % out_path)
 
         if os.sys.platform == "darwin":
-            os.system("open ~/Desktop/Battery_hotpatch")
+            os.system("open " + out_path)
         elif os.sys.platform == "win32":
-            user = os.path.expanduser("~")
-            os.system("start %s\\Desktop\\Battery_hotpatch"%user)
+            os.system("start " + out_path)
 
 def opener(filepath:str):
     try:
