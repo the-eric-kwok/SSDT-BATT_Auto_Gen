@@ -800,11 +800,12 @@ class AutoGen:
                     ret_spl = ret.splitlines()
                     for line in ret_spl:
                         if line.startswith("AML Output"):
-                            if '0 bytes' not in line:
+                            if ' 0 bytes' not in line:
                                 print(COMPILE_SUCCESS_MSG)
                                 break
                             else:
                                 print(COMPILE_FAILED_ERR)
+                                print(ret)
                 else:
                     print(COMPILE_FAILED_ERR)
         elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
@@ -819,6 +820,7 @@ class AutoGen:
                                 break
                             else:
                                 print(COMPILE_FAILED_ERR)
+                                print(ret)
                 else:
                     print(COMPILE_FAILED_ERR)
         else:
@@ -874,7 +876,7 @@ def parse_args():
             filename = arg
             filepath = os.path.abspath(filename)
             dsdt_content = opener(filepath=filepath)
-        if '.aml' in arg:
+        if '.aml' in arg or '.dat' in arg:
             if os.path.exists('./iasl') and os.sys.platform == "darwin":
                 #print("file: "+arg)
                 with os.popen('./iasl -d "%s" 2>&1' % arg) as p:
