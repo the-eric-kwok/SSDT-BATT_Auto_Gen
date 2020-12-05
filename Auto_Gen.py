@@ -284,6 +284,8 @@ class AutoGen:
                     for unit in OR_info["field_unit"]:
                         if VERBOSE:
                             print("Parsing", unit)
+                        if unit['name'] == 'BCC':
+                            print('trigger')
                         unit_path = '.'.join(unit['OR path'].split('.')[:-1])
                         if scope == unit_path:
                             # Patch field writing, e.g. UNIT = xxxx
@@ -319,7 +321,7 @@ class AutoGen:
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = UNIT
-                            reserve = re.findall("(.*[^\.])%s(.*)" % unit['name'],
+                            reserve = re.findall("(.*[^\.a-zA-Z])%s([^a-zA-Z0-9\.].*)" % unit['name'],
                                                  self.method[scope][method]['content'])
                             for item in reserve:
                                 if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
@@ -369,7 +371,7 @@ class AutoGen:
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = EC0.UNIT
-                            reserve = re.findall("(.*%s\.)%s(.*)" % (unit['OR path'].split('.')[-2], unit['name']),
+                            reserve = re.findall("(.*%s\.)%s([^a-zA-Z0-9\.].*)" % (unit['OR path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]['content'])
                             for item in reserve:
                                 for line in lines:
