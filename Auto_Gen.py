@@ -8,6 +8,7 @@ import re
 from multilanguage import *
 import time
 import get_content
+from cons_strings import *
 import copy
 
 dangerous_patch_list = ['_STA', '_CRS', '_REG', '_ADR', '_PRW', '_DCS', '_DGS', '_DSS', '_INI', '_PS0', '_PS1',
@@ -21,8 +22,7 @@ class AutoGen:
     OR_info = []
     verbose = False
     debug = False
-    head = """DefinitionBlock ("", "SSDT", 2, "ERIC", "BATT", 0x00000000)
-{"""
+    head = HEAD
     RW_method = ""
     comment = ""
 
@@ -172,72 +172,20 @@ class AutoGen:
                         if item["OR path"] == OR_path:
                             item["read method"] = self.RECB
                             item["write method"] = self.WECB
-                        self.RW_method = '''
-    Scope (%s)
-    {
-        Method (%s, 1, NotSerialized)
-        {
-            OperationRegion (%s, %s, Arg0, One)
-            Field (%s, ByteAcc, NoLock, Preserve)
-            {
-                BYTE,   8
-            }
-
-            Return (BYTE) /* \RE1B.BYTE */
-        }
-
-        Method (%s, 2, Serialized)
-        {
-            // RECB or RSMB
-            // Arg0 - offset in bytes from zero-based EC
-            // Arg1 - size of buffer in bits
-            Arg1 = ((Arg1 + 0x07) >> 0x03)
-            name (TEMP, Buffer (Arg1){})
-            Arg1 += Arg0
-            Local0 = Zero
-            While ((Arg0 < Arg1))
-            {
-                TEMP [Local0] = %s (Arg0)
-                Arg0++
-                Local0++
-            }
-
-            Return (TEMP) /* \RECB.TEMP */
-        }
-
-        Method (%s, 2, NotSerialized)
-        {
-            OperationRegion (%s, %s, Arg0, One)
-            Field (%s, ByteAcc, NoLock, Preserve)
-            {
-                BYTE,   8
-            }
-
-            BYTE = Arg1
-        }
-
-        Method (%s, 3, Serialized)
-        {
-            // WECB or WSMB
-            // Arg0 - offset in bytes from zero-based EC
-            // Arg1 - size of buffer in bits
-            // Arg2 - data to be written
-            Arg1 = ((Arg1 + 0x07) >> 0x03)
-            name (TEMP, Buffer (Arg1){})
-            TEMP = Arg2
-            Arg1 += Arg0
-            Local0 = Zero
-            While ((Arg0 < Arg1))
-            {
-                %s (Arg0, DerefOf (TEMP [Local0]))
-                Arg0++
-                Local0++
-            }
-        }
-    }
-''' % (OR_info["path"], self.RE1B, self.ERM2, OR_info["storage"],
-                            self.ERM2, self.RECB, self.RE1B, self.WE1B, self.ERM2,
-                            OR_info["storage"], self.ERM2, self.WECB, self.WE1B)
+                        self.RW_method = RW_METHOD[0] + \
+                            OR_info["path"] + RW_METHOD[1] +\
+                            self.RE1B + RW_METHOD[2] + \
+                            self.ERM2 + RW_METHOD[3] + \
+                            OR_info["storage"] + RW_METHOD[4] + \
+                            self.ERM2 + RW_METHOD[5] + \
+                            self.RECB + RW_METHOD[6] + \
+                            self.RE1B + RW_METHOD[7] + \
+                            self.WE1B + RW_METHOD[8] + \
+                            self.ERM2 + RW_METHOD[9] + \
+                            OR_info["storage"] + RW_METHOD[10] + \
+                            self.ERM2 + RW_METHOD[11] + \
+                            self.WECB + RW_METHOD[12] + \
+                            self.WE1B + RW_METHOD[13]
         if "RECB" not in self.RW_method:
             print(NOT_NEED_TO_PATCH_MSG)
             exit(0)
@@ -428,141 +376,33 @@ class AutoGen:
                             '_TTS, 1, (NotSerialized|Serialized)', self.dsdt_content).groups()[0]
                     except AttributeError:
                         pass
-                    PCI9 = '''
-        Device (PCI9)
-        {
-            Name (_ADR, Zero)
-            Name (FNOK, Zero)
-            Name (MODE, Zero)
-            //
-            Name (TPTS, Zero)
-            Name (TWAK, Zero)
-            Method (_STA, 0, NotSerialized)
-            {
-                If (_OSI ("Darwin"))
-                {
-                    Return (0x0F)
-                }
-                Else
-                {
-                    Return (Zero)
-                }
-            }
-        }'''
+
                     method_new['\\_SB'] = {'\\_SB.PCI9': {
                         'content': PCI9, 'modified': True}}
 
-                    PTS = '''
-        Method (_PTS, 1, %s) //Method (_PTS, 1, Serialized)
-        {
-            If (_OSI ("Darwin"))
-            {
-                \_SB.PCI9.TPTS = Arg0
-
-                if(\_SB.PCI9.FNOK ==1)
-                {
-                    Arg0 = 3
-                }
-
-                If (CondRefOf (\DGPU._ON))
-                {
-                    \DGPU._ON ()
-                }
-
-                If (CondRefOf(EXT1))
-                {
-                    EXT1(Arg0)
-                }
-                If (CondRefOf(EXT2))
-                {
-                    EXT2(Arg0)
-                }
-            }
-            If (CondRefOf (\YPTS) && _OSI ("Darwin"))
-            {
-                \YPTS(Arg0)
-            }
-            Else
-            {
-                \XPTS(Arg0)
-            }
-        }''' % PTS_Serialized
+                    _PTS = PTS[0] + PTS_Serialized + PTS[1]
                     if '\\_PTS' in method_new['\\']:
-                        method_new['\\']['\\_PTS']['content'] += PTS
+                        method_new['\\']['\\_PTS']['content'] += _PTS
                         method_new['\\']['\\_PTS']['modified'] = True
                     else:
                         method_new['\\']['\\_PTS'] = {
-                            'content': PTS, 'modified': True}
+                            'content': _PTS, 'modified': True}
 
-                    WAK = '''
-        Method (_WAK, 1, %s) //Method (_WAK, 1, Serialized)
-        {
-            If (_OSI ("Darwin"))
-            {
-                \_SB.PCI9.TWAK = Arg0
-
-                if(\_SB.PCI9.FNOK ==1)
-                {
-                    \_SB.PCI9.FNOK =0
-                    Arg0 = 3
-                }
-
-                If (CondRefOf (\DGPU._OFF))
-                {
-                    \DGPU._OFF ()
-                }
-
-                If (CondRefOf(EXT3))
-                {
-                    EXT3(Arg0)
-                }
-                If (CondRefOf(EXT4))
-                {
-                    EXT4(Arg0)
-                }
-            }
-            If (CondRefOf (\YWAK) && _OSI ("Darwin"))
-            {
-                Return (\YWAK(Arg0))
-            }
-            Else
-            {
-                Return (\XWAK(Arg0))
-            }
-        }''' % WAK_Serialized
+                    _WAK = WAK[0] + WAK_Serialized + WAK[1]
                     if '\\_WAK' in method_new['\\']:
-                        method_new['\\']['\\_WAK']['content'] += WAK
+                        method_new['\\']['\\_WAK']['content'] += _WAK
                         method_new['\\']['\\_WAK']['modified'] = True
                     else:
                         method_new['\\']['\\_WAK'] = {
-                            'content': WAK, 'modified': True}
+                            'content': _WAK, 'modified': True}
 
-                    TTS = '''
-        Method (_TTS, 1, %s) //Method (_TTS, 1, Serialized)
-        {
-            If (_OSI ("Darwin"))
-            {
-                If (CondRefOf(EXT5))
-                {
-                    EXT5(Arg0)
-                }
-                If (CondRefOf(EXT6))
-                {
-                    EXT6(Arg0)
-                }
-            }
-
-            If (CondRefOf(\XTTS))
-            {
-                \XTTS(Arg0)
-            }
-        }''' % TTS_Serialized
+                    _TTS = TTS[0] + TTS_Serialized + TTS[1]
                     if '\\_TTS' in method_new['\\']:
-                        method_new['\\']['\\_TTS']['content'] += TTS
+                        method_new['\\']['\\_TTS']['content'] += _TTS
                         method_new['\\']['\\_TTS']['modified'] = True
                     else:
                         method_new['\\']['\\_TTS'] = {
-                            'content': TTS, 'modified': True}
+                            'content': _TTS, 'modified': True}
 
         self.method = method_new
         del method_new
@@ -623,18 +463,7 @@ class AutoGen:
                 if dev not in self.method:
                     self.method[dev] = {}
                 self.method[dev]["%s._STA" % dev] = {
-                    'content': '''        Method (_STA, 0, NotSerialized)
-            {
-                If (_OSI("Darwin"))
-                {
-                    Return (0)
-                }
-                Else
-                {
-                    Return(XSTA())
-                }
-            }
-    ''',
+                    'content': ACEL_STA,
                     'modified': True
                 }
 
@@ -880,7 +709,7 @@ def parse_args():
             dsdt_content = opener(filepath=filepath)
         if '.aml' in arg or '.dat' in arg:
             if os.path.exists('./iasl') and os.sys.platform == "darwin":
-                #print("file: "+arg)
+                # print("file: "+arg)
                 with os.popen('./iasl -d "%s" 2>&1' % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
@@ -889,7 +718,7 @@ def parse_args():
                         print(ret)
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
-                #print("file: "+arg)
+                # print("file: "+arg)
                 with os.popen('.\\iasl.exe -d "%s" 2>&1' % arg) as p:
                     ret = p.read()
                     if "ASL Output" in ret:
