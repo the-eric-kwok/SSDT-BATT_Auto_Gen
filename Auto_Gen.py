@@ -65,14 +65,12 @@ class AutoGen:
         '''
         Spliting dsdt content by space. Will not remove spaces if not in debug mode.
         '''
-        self.dsdt_splited = self.dsdt_content.split(' ')
         if DEBUG:
-            length = len(self.dsdt_splited)
-            for i in range(0, length):
-                # remove spaces
-                i = length - i - 1
-                if self.dsdt_splited[i] == '':
-                    del self.dsdt_splited[i]
+            dsdt_splitline = self.dsdt_content.splitlines()
+            for i in range(0, len(dsdt_splitline)):
+                dsdt_splitline[i].strip()
+            self.dsdt_content = '\n'.join(dsdt_splitline)
+        self.dsdt_splited = self.dsdt_content.split(' ')
 
     def find_OperationRegion(self):
         '''
