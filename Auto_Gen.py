@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from os import replace
+import random
 import sys
 import os
 import re
@@ -63,7 +64,7 @@ class AutoGen:
 
     def split_dsdt(self):
         '''
-        Spliting dsdt content by space. Will not remove spaces if not in debug mode.
+        Spliting dsdt content by space. Will not strip them if not in debug mode.
         '''
         if DEBUG:
             dsdt_splitline = self.dsdt_content.splitlines()
@@ -76,12 +77,15 @@ class AutoGen:
         '''
         Finding OperationRegion(s) inside EC scope.
         '''
+        if VERBOSE:
+            print(
+                "Into: find_OperationRegion(): Finding OperationRegion(s) inside EC scope.")
         EC_content = self.EC_content
         for dev in EC_content:
             OR_list = re.findall(
                 "OperationRegion \\(([A-Z0-9]{2,4}),", EC_content[dev])
             for OR in OR_list:
-                OR_info = re.search(  # 使用分组来获得 OperationRegion 的信息
+                OR_info = re.search(  # Getting info of OperationRegions by re.group
                     "OperationRegion \\(%s, ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\\)" % OR, EC_content[dev])
                 try:
                     if OR_info.group(2) == 'Zero':
@@ -108,100 +112,114 @@ class AutoGen:
                 print(item)
             print()
 
-    def rename(self, orig_name: str):
-        '''
-        Method to rename field unit / method / device / anything without conflicting with one already there.
-
-        @param: orig_name(str) - original name
-
-        @return: new_name(str) - renamed name
-        '''
-        alphabet = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-                    'A', 'B', 'C', 'D', 'E', 'F', 'G',
-                    'H', 'I', 'J', 'K', 'L', 'M', 'N',
-                    'O', 'P', 'Q', 'R', 'S', 'T',
-                    'U', 'V', 'W', 'X', 'Y', 'Z')
-        for char in alphabet:
-            new_name = orig_name[:3]+char
-            if self.dsdt_content.find(new_name) == -1:
-                return new_name
-
     def find_field(self):
         '''
         Finding out which unit field is going to be patched inside EC scope.
         '''
-        for OR_info in self.OR_info:
-            OR_info["field_unit"] = []
-            OR_path = OR_info["path"]+'.'+OR_info["name"]
+        if VERBOSE:
+            print(
+                "Into: find_field(): Finding out which unit field is going to be patched inside EC scope.")
+        for OR in self.OR_info:
+            OR["field_unit"] = []
+            OR_path = OR["path"]+'.'+OR["name"]
             content = get_content.get_content(self.dsdt_content, OR_path)
-            splited = content.split("}")
-            for field in splited[:-1]:
-                flag = False  # Is there any field that needs special R/W in this method?
-                tmp = field.split('{')
-                field_content = tmp[1].split('\n')
-                offset_bit = 0  # offset in bits
+            for field in content.split("}")[:-1]:
+                field = field.split('{')[1]  # Remove field header
+                store_flag = False  # Is there any field that larger than 16 bits in this method?
+                field_content_splln = field.split('\n')
+                offset_bits = 0  # offset in bits
                 name = ''
                 size = 0
-                for item in field_content:
+                for item in field_content_splln:
                     if ',' not in item:
                         # Skip empty line
                         continue
                     elif "Offset" not in item:
-                        a = item.split(',')
-                        name = a[0].strip()
-                        size = int(a[1].strip())
+                        item_spl = item.split(',')
+                        name = item_spl[0].strip()
+                        size = int(item_spl[1].strip())
                         if size > 8 and name != '':
-                            if offset_bit/8 - int(offset_bit/8) != 0:
+                            if offset_bits/8 - int(offset_bits/8) != 0:
                                 print(FIELD_UNIT_OFFSET_ERR)
                                 exit(2)
-                            OR_info["field_unit"].append(
-                                {"name": name, "offset": int(offset_bit/8), "size": size, "OR path": OR_path})
-                            flag = True
-                        offset_bit += size
+                            OR["field_unit"].append(
+                                {"name": name, "offset": int(offset_bits/8), "size": size, "OR_path": OR_path})
+                            store_flag = True
+                        offset_bits += size
                     else:
                         item = item.strip()
                         offset = re.search(r'Offset \((.*)\)', item).group(1)
-                        offset_bit = int(offset, 16) * 8
+                        offset_bits = int(offset, 16) * 8
 
-                if flag:
-                    if OR_info["storage"] not in self.RW_method and OR_info["path"] not in self.RW_method:
-                        self.RE1B = self.rename('R1B')
-                        self.RECB = self.rename('RDB')
-                        self.ERM2 = self.rename('MEM')
-                        self.WE1B = self.rename('W1B')
-                        self.WECB = self.rename('WRB')
-                    for item in OR_info["field_unit"]:
-                        if item["OR path"] == OR_path:
-                            item["read method"] = self.RECB
-                            item["write method"] = self.WECB
-                        self.RW_method = RW_METHOD[0] + \
-                            OR_info["path"] + RW_METHOD[1] +\
-                            self.RE1B + RW_METHOD[2] + \
-                            self.ERM2 + RW_METHOD[3] + \
-                            OR_info["storage"] + RW_METHOD[4] + \
-                            self.ERM2 + RW_METHOD[5] + \
-                            self.RECB + RW_METHOD[6] + \
-                            self.RE1B + RW_METHOD[7] + \
-                            self.WE1B + RW_METHOD[8] + \
-                            self.ERM2 + RW_METHOD[9] + \
-                            OR_info["storage"] + RW_METHOD[10] + \
-                            self.ERM2 + RW_METHOD[11] + \
-                            self.WECB + RW_METHOD[12] + \
-                            self.WE1B + RW_METHOD[13]
+                if store_flag:
+                    # Store this OperationRegion and its units
+                    if OR["storage"] not in self.RW_method:
+                        while True:
+                            # This will generate a new R/W method name
+                            letter = random.choice(
+                                '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+                            OR['RE1B'] = 'R1B'+letter
+                            OR['RECB'] = 'REB' + letter
+                            OR['ERM2'] = 'MEM'+letter
+                            OR['WE1B'] = 'W1B'+letter
+                            OR['WECB'] = 'WRB' + letter
+                            if (self.dsdt_content.find(OR['RE1B']) == -1 and OR['RE1B'] not in self.RW_method) \
+                                    and (self.dsdt_content.find(OR['RECB']) == -1 and OR['RECB'] not in self.RW_method) \
+                                    and (self.dsdt_content.find(OR['ERM2']) == -1 and OR['ERM2'] not in self.RW_method) \
+                                    and (self.dsdt_content.find(OR['WE1B']) == -1 and OR['WE1B'] not in self.RW_method) \
+                                    and (self.dsdt_content.find(OR['WECB']) == -1 and OR['WECB'] not in self.RW_method):
+                                # Loop until there is nothing has the same name as our generated one
+                                break
+
+                        # Add the content of R/W method to self.RW_method
+                        self.RW_method += RW_METHOD[0] + \
+                            OR["path"] + RW_METHOD[1] +\
+                            OR['RE1B'] + RW_METHOD[2] + \
+                            OR['ERM2'] + RW_METHOD[3] + \
+                            OR["storage"] + RW_METHOD[4] + \
+                            OR['ERM2'] + RW_METHOD[5] + \
+                            OR['RECB'] + RW_METHOD[6] + \
+                            OR['RE1B'] + RW_METHOD[7] + \
+                            OR['WE1B'] + RW_METHOD[8] + \
+                            OR['ERM2'] + RW_METHOD[9] + \
+                            OR["storage"] + RW_METHOD[10] + \
+                            OR['ERM2'] + RW_METHOD[11] + \
+                            OR['WECB'] + RW_METHOD[12] + \
+                            OR['WE1B'] + RW_METHOD[13]
+                    else:
+                        # If OR['storage'] in self.RW_method and not in OR itself
+                        # Then copy the read/write method from other OR which has the same storage
+                        for _OR_ in self.OR_info:
+                            if _OR_['storage'] == OR['storage']:
+                                OR['RE1B'] = _OR_['RE1B']
+                                OR['RECB'] = _OR_['RECB']
+                                OR['ERM2'] = _OR_['ERM2']
+                                OR['WE1B'] = _OR_['WE1B']
+                                OR['WECB'] = _OR_['WECB']
+                                break
+
+        for OR in self.OR_info:
+            if len(OR['field_unit']) < 1:
+                self.OR_info.remove(OR)
+
         if "RECB" not in self.RW_method:
             print(NOT_NEED_TO_PATCH_MSG)
             exit(0)
+
+        if VERBOSE:
+            for OR in self.OR_info:
+                print(OR['path'] + '.' + OR['name'] + ', ' + OR['storage'])
+                for unit in OR['field_unit']:
+                    print('  -', unit)
 
     def patch_method(self):
         '''
         Getting method content by unit fields which is going to be patched. And patch each method returned.
         '''
         self.method = {}
-        for OR_info in self.OR_info:
+        for OR in self.OR_info:
             # Getting method content
-            for unit in OR_info["field_unit"]:
-                if VERBOSE:
-                    print("Unit:", unit)
+            for unit in OR["field_unit"]:
                 result = get_content.search(self.dsdt_content, unit["name"])
                 for name in result:
                     if result[name].split()[0] != "Method":
@@ -231,13 +249,11 @@ class AutoGen:
                     if VERBOSE:
                         print("\n%s\n| Patching: %s |\n%s" % (
                             '='*(14+len(method)), method, '='*(14+len(method))))
-                    for unit in OR_info["field_unit"]:
+                    for unit in OR["field_unit"]:
                         if VERBOSE:
                             print("Parsing", unit)
-                        if unit['name'] == 'BCC':
-                            print('trigger')
-                        unit_path = '.'.join(unit['OR path'].split('.')[:-1])
-                        if scope == unit_path:
+                        unit_path = '.'.join(unit['OR_path'].split('.')[:-1])
+                        if unit_path in scope:
                             # Patch field writing, e.g. UNIT = xxxx
                             reserve = re.findall(
                                 "([^\.])%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
@@ -246,8 +262,8 @@ class AutoGen:
                                     target = "%s%s = %s" % (
                                         item[0], unit['name'], item[1])
                                     if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
-                                                                           unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], OR['WECB'],
+                                                                           unit["offset"] + OR["offset"], unit["size"], item[1])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
@@ -262,8 +278,24 @@ class AutoGen:
                                     target = "Store (%s, %s)" % (
                                         item, unit['name'])
                                     if target in line:
-                                        replace = "%s (0x%X, %s, %s)" % (unit["write method"],
-                                                                         unit["offset"] + OR_info["offset"], unit["size"], item)
+                                        replace = "%s (0x%X, %s, %s)" % (OR['WECB'],
+                                                                         unit["offset"] + OR["offset"], unit["size"], item)
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
+                                self.method[scope][method]['modified'] = True
+
+                            # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = B1B2 (ECRD (RefOf (UNI0)), ECRD (RefOf (UNI1)))
+                            reserve = re.findall("(.*)ECRD \(RefOf \(%s\)\)(.*)" % unit['name'],
+                                                 self.method[scope][method]['content'])
+                            for item in reserve:
+                                for line in lines:
+                                    target = '%sECRD (RefOf (%s))%s' % (
+                                        item[0], unit['name'], item[1])
+                                    if target in line:
+                                        replace = '%s%s (0x%X, %s)%s' % (
+                                            item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
@@ -279,8 +311,8 @@ class AutoGen:
                                 for line in lines:
                                     target = item[0] + unit['name'] + item[1]
                                     if target in line:
-                                        replace = '%s%s (0x%X, %s)%s' % (item[0], unit['read method'],
-                                                                         unit['offset'] + OR_info["offset"], unit['size'], item[1])
+                                        replace = '%s%s (0x%X, %s)%s' % (item[0], OR['RECB'],
+                                                                         unit['offset'] + OR["offset"], unit['size'], item[1])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
@@ -289,15 +321,15 @@ class AutoGen:
 
                         else:
                             # Patch field writing, e.g. EC0.UNIT = xxxx
-                            reserve = re.findall("(.*%s\.)%s = (\\w+)" % (unit['OR path'].split('.')[-2], unit['name']),
+                            reserve = re.findall("(.*%s\.)%s = (\\w+)" % (unit['OR_path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]["content"])
                             for item in reserve:
                                 for line in lines:
                                     target = "%s%s = %s" % (
                                         item[0], unit['name'], item[1])
                                     if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], unit["write method"],
-                                                                           unit["offset"] + OR_info["offset"], unit["size"], item[1])
+                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], OR['WECB'],
+                                                                           unit["offset"] + OR["offset"], unit["size"], item[1])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
@@ -305,15 +337,31 @@ class AutoGen:
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field writing, e.g. Store (xxxx, UNIT)
-                            reserve = re.findall("Store \\((\\w+), (.*%s.)%s\\)" % (unit['OR path'].split('.')[-2], unit['name']),
+                            reserve = re.findall("Store \\((\\w+), (.*%s.)%s\\)" % (unit['OR_path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]["content"])
                             for item in reserve:
                                 for line in lines:
                                     target = "Store (%s, %s%s)" % (
                                         item[0], item[1], unit['name'])
                                     if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (item[1], unit["write method"],
-                                                                           unit["offset"] + OR_info["offset"], unit["size"], item[0])
+                                        replace = "%s%s (0x%X, %s, %s)" % (item[1], OR['WECB'],
+                                                                           unit["offset"] + OR["offset"], unit["size"], item[0])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
+                                self.method[scope][method]['modified'] = True
+
+                            # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = B1B2 (ECRD (RefOf (UNI0)), ECRD (RefOf (UNI1)))
+                            reserve = re.findall("(.*)ECRD \(RefOf \((.*%s\.)%s\)\)(.*)" % (unit['OR_path'].split('.')[-2], unit['name']),
+                                                 self.method[scope][method]['content'])
+                            for item in reserve:
+                                for line in lines:
+                                    target = '%sECRD (RefOf (%s%s))%s' % (
+                                        item[0], item[1], unit['name'], item[2])
+                                    if target in line:
+                                        replace = '%s%s%s (0x%X, %s)%s' % (
+                                            item[0], item[1], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
@@ -321,7 +369,7 @@ class AutoGen:
                                 self.method[scope][method]['modified'] = True
 
                             # Patch field reading, e.g. xxxx = EC0.UNIT
-                            reserve = re.findall("(.*%s\.)%s([^a-zA-Z0-9\.].*)" % (unit['OR path'].split('.')[-2], unit['name']),
+                            reserve = re.findall("(.*%s\.)%s([^a-zA-Z0-9\.].*)" % (unit['OR_path'].split('.')[-2], unit['name']),
                                                  self.method[scope][method]['content'])
                             for item in reserve:
                                 for line in lines:
@@ -329,8 +377,8 @@ class AutoGen:
                                         continue  # stop patching method that have the same name as fieldunit
                                     target = item[0] + unit['name'] + item[1]
                                     if target in line:
-                                        replace = '%s%s (0x%X, %s)%s' % (item[0], unit['read method'],
-                                                                         unit['offset'] + OR_info["offset"], unit['size'], item[1])
+                                        replace = '%s%s (0x%X, %s)%s' % (item[0], OR['RECB'],
+                                                                         unit['offset'] + OR["offset"], unit['size'], item[1])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(

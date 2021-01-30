@@ -1,3 +1,7 @@
+'''
+Some constant strings that is used in the main program.
+'''
+
 HEAD = """DefinitionBlock ("", "SSDT", 2, "ERIC", "BATT", 0x00000000)
 {
 """
