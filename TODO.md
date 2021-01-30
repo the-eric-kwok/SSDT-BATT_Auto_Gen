@@ -25,6 +25,7 @@
 - [x] 重命名补丁生成
 - [x] 生成产品在桌面
 - [x] Field 名字只有三个字母的时候报“无需patch”，如 Sample/DSDT.dsl
+- [ ] 修复导致 Sample/DSDT-ZHAOYANG K4-iwl.dsl 无法正确 patch 的 bug（猜测是在 patch_method() 内）
 - [ ] 智能识别 clover 和 OC，并注入 plist 文件
 - [ ] 16 位变量拆分
 - [ ] 16 位使用 B1B2 读取
