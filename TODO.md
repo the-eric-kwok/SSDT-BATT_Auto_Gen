@@ -24,7 +24,8 @@
 - [x] Mutex 置零补丁生成
 - [x] 重命名补丁生成
 - [x] 生成产品在桌面
-- [x] Field 名字只有三个字母的时候报“无需patch”，如 Sample/DSDT.dsl
+- [x] Field 名字只有三个字母的时候报“无需patch”
+- [ ] 处理 OperationRegion 中偏移量为变量名的情况，如 DSDT_ASUS_FX503VD.dsl
 - [ ] 智能识别 clover 和 OC，并注入 plist 文件
 - [ ] 16 位变量拆分
 - [ ] 16 位使用 B1B2 读取

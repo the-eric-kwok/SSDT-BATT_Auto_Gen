@@ -88,8 +88,12 @@ class AutoGen:
                         offset = 0
                     elif OR_info.group(2) == 'One':
                         offset = 1
-                    else:
+                    elif 'Arg' in OR_info.group(2):
+                        continue  # TODO
+                    elif '0x' in OR_info.group(2):
                         offset = int(OR_info.group(2), 16)
+                    else:
+                        offset = OR_info.group(2)
                     self.OR_info.append({
                         "path": dev,
                         "name": OR,
