@@ -258,7 +258,6 @@ class AutoGen:
                                     target = "%s%s = %s" % (
                                         item[0], unit['name'], item[1])
                                     if target in line:
-                                        # TODO: 将 unit["write method"] 改为 OR['WECB']
                                         replace = "%s%s (0x%X, %s, %s)" % (item[0], OR['WECB'],
                                                                            unit["offset"] + OR["offset"], unit["size"], item[1])
                                         replace = line.replace(
