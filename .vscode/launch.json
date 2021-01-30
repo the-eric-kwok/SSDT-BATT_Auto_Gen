@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT-HP_EliteBook_Folio_9470m.dsl"
+                "Sample/DSDT-ZHAOYANG K4-iwl.dsl"
             ]
         }
     ]
