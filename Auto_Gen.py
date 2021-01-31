@@ -12,6 +12,13 @@ import get_content
 from cons_strings import *
 import copy
 
+# Third party libraies
+try:
+    import chardet
+    __CHARDET__ = True
+except ImportError:
+    __CHARDET__ = False
+
 dangerous_patch_list = ['_STA', '_CRS', '_REG', '_ADR', '_PRW', '_DCS', '_DGS', '_DSS', '_INI', '_PS0', '_PS1',
                         '_PS2', '_PS3', '_PS4', '_PS5', '_S0D', '_S1D', '_S2D', '_S3D', '_S4D', '_S5D']
 VERBOSE = False
@@ -718,13 +725,31 @@ def opener(filepath: str):
     try:
         with open(filepath, 'r') as f:
             content = f.read()
+            return content
+    except UnicodeDecodeError:
+        with open(filepath, 'rb') as fb:
+            rawdata = fb.read()
+            for encoding in ('ascii', 'utf8', 'gbk', 'latin1'):
+                try:
+                    content = rawdata.decode(encoding)
+                    return content
+                except UnicodeDecodeError:
+                    pass
+            try:
+                content
+            except NameError:
+                if __CHARDET__:
+                    guessing = chardet.detect(rawdata)
+                    if guessing['confidence'] > 0.5:
+                        content = rawdata.decode(guessing['encoding'])
+                        return content
+                raise RuntimeError('File encoding not known')
     except FileNotFoundError:
         print(FILE_NOT_FOUND_ERR)
         exit(1)
     except PermissionError:
         print(PERMISSION_ERR)
         exit(1)
-    return content
 
 
 def show_help():
