@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT-ZHAOYANG K4-iwl.dsl"
+                "Sample/DSDT-雷神911air.dsl"
             ]
         }
     ]

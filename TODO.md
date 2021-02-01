@@ -27,6 +27,7 @@
 - [x] Field 名字只有三个字母的时候报“无需patch”
 - [ ] 处理 OperationRegion 中偏移量为变量名的情况，如 DSDT_ASUS_FX503VD.dsl
 - [ ] 修复导致 Sample/DSDT-ZHAOYANG K4-iwl.dsl 无法正确 patch 的 bug（猜测是在 patch_method() 内）
+- [x] 处理 DSDT 使用 ECRD、ECWT 来读写变量的情况(绕开ECRD使用RECB来读取)
 - [ ] 智能识别 clover 和 OC，并注入 plist 文件
 - [ ] 16 位变量拆分
 - [ ] 16 位使用 B1B2 读取

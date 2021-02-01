@@ -293,7 +293,23 @@ class AutoGen:
                                             line, replace)
                                 self.method[scope][method]['modified'] = True
 
-                            # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = B1B2 (ECRD (RefOf (UNI0)), ECRD (RefOf (UNI1)))
+                            # TODO: Patch field writing, e.g. ECWT (data, RefOf (UNIT)) to WECB(offset, size, data)
+                            reserve = re.findall("(.*)ECWT \((.*), RefOf \(%s\)\)(.*)" % unit['name'],
+                                                 self.method[scope][method]['content'])
+                            for item in reserve:
+                                for line in lines:
+                                    target = '%sECWT (%s, RefOf (%s))%s' % (
+                                        item[0], item[1], unit['name'], item[2])
+                                    if target in line:
+                                        replace = "%s%s (0x%X, %s, %s)" % (
+                                            item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]['content'] = self.method[scope][method]['content'].replace(
+                                            line, replace)
+                                self.method[scope][method]['modified'] = True
+
+                            # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = RECB(offset, size)
                             reserve = re.findall("(.*)ECRD \(RefOf \(%s\)\)(.*)" % unit['name'],
                                                  self.method[scope][method]['content'])
                             for item in reserve:
@@ -351,11 +367,27 @@ class AutoGen:
                                     target = "Store (%s, %s%s)" % (
                                         item[0], item[1], unit['name'])
                                     if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (item[1], OR['WECB'],
-                                                                           unit["offset"] + OR["offset"], unit["size"], item[0])
+                                        replace = "%s%s (0x%X, %s, %s)" % (
+                                            item[1], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[0])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
+                                            line, replace)
+                                self.method[scope][method]['modified'] = True
+
+                            # TODO: Patch field writing, e.g. ECWT (data, RefOf (UNIT)) to WECB(offset, size, data)
+                            reserve = re.findall("(.*)ECWT \((.*), RefOf \((.*%s\.)%s\)\)(.*)" % (unit['OR_path'].split('.')[-2], unit['name']),
+                                                 self.method[scope][method]['content'])
+                            for item in reserve:
+                                for line in lines:
+                                    target = '%sECWT (%s, RefOf (%s%s))%s' % (
+                                        item[0], item[1], item[2], unit['name'], item[3])
+                                    if target in line:
+                                        replace = "%s%s (0x%X, %s, %s)" % (
+                                            item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                        replace = line.replace(
+                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
+                                        self.method[scope][method]['content'] = self.method[scope][method]['content'].replace(
                                             line, replace)
                                 self.method[scope][method]['modified'] = True
 
@@ -367,8 +399,8 @@ class AutoGen:
                                     target = '%sECRD (RefOf (%s%s))%s' % (
                                         item[0], item[1], unit['name'], item[2])
                                     if target in line:
-                                        replace = '%s%s%s (0x%X, %s)%s' % (
-                                            item[0], item[1], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
+                                        replace = '%s%s (0x%X, %s)%s' % (
+                                            item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
                                         replace = line.replace(
                                             target, replace) + ' // %s.%s' % (unit_path, unit['name'])
                                         self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
