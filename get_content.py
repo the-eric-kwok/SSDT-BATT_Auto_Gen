@@ -1,18 +1,22 @@
 import re
-from Auto_Gen import DEBUG, VERBOSE
+from typing import Tuple
 
-def split_dsdt(dsdt_content:str):
-    dsdt_splited = dsdt_content.split(' ')
-    if DEBUG:
-        length = len(dsdt_splited)
-        for i in range(0, length):
-            # remove spaces
-            i = length - i - 1
-            if dsdt_splited[i] == '':
-                del dsdt_splited[i]
-    return dsdt_splited
+VERBOSE = False
+DEBUG = False
 
-def get_content(dsdt_content:str, target: str):
+
+def set_verbose(flag):
+    global VERBOSE
+    VERBOSE = flag
+
+
+def set_debug(flag):
+    global VERBOSE, DEBUG
+    DEBUG = flag
+    VERBOSE = flag
+
+
+def get_content(dsdt_splited: list, target: str):
     '''
     Getting file content about given target.
 
@@ -24,7 +28,9 @@ def get_content(dsdt_content:str, target: str):
 
     @return: content(str) - file content about that device/field/method
     '''
-    dsdt_splited = split_dsdt(dsdt_content)
+    if VERBOSE:
+        print("Into: get_content(), getting %s" % target)
+    #dsdt_splited = split_dsdt(dsdt_content)
     stack = []
     trigger = False
     is_string = False
@@ -41,113 +47,20 @@ def get_content(dsdt_content:str, target: str):
             if not is_string:
                 stack.append("DefinitionBlock")
 
-        elif dsdt_splited[i] == "Field":
+        elif dsdt_splited[i] in ("Field", "Scope", "Method", "Device"):
             try:
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                name = re.findall(r'\((.*)[,\)]', dsdt_splited[i+1])[0]
                 trigger = True  # 触发检查当前路径
             except IndexError:
                 continue
-            stack.append(("Field", name))
+            stack.append((dsdt_splited[i], name))
 
-        elif dsdt_splited[i] == "IndexField":
-            try:
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                trigger = True  # 触发检查当前路径
-            except IndexError:
-                continue
-            stack.append(("IndexField", name))
-
-        elif dsdt_splited[i] == "Scope":
-            try:
-                path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                trigger = True  # 触发检查当前路径
-            except IndexError:
-                continue
-            stack.append(("Scope", path))
-
-        elif dsdt_splited[i] == "Method":
-            try:
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-                trigger = True  # 触发检查当前路径
-            except IndexError:
-                continue
-            stack.append(("Method", name))
-
-        elif dsdt_splited[i] == "Device":
-            try:
-                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                trigger = True  # 触发检查当前路径
-            except IndexError:
-                continue
-            stack.append(("Device", name))
-
-        elif dsdt_splited[i] == "ThermalZone":
-            try:
-                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-                trigger = True  # 触发检查当前路径
-            except IndexError:
-                continue
-            stack.append(("ThermalZone", name))
-
-        elif dsdt_splited[i] in ("If", "(If"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Else\n":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "ElseIf":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Switch":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Case":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Default\n":
-            # don't remove that \n
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "While":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("Buffer", "(Buffer"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("Package", "(Package"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "IRQ":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "IRQNoFlags":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("ResourceTemplate", "(ResourceTemplate"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Interrupt":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "GpioInt":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "GpioIo":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "StartDependentFn":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "StartDependentFnNoPri":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Processor":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "PowerResource":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("DMA", "(DMA"):
+        elif dsdt_splited[i] in (  # ignore list
+            "If", "(If", "Else\n", "ElseIf", "Switch", "Case", "Default\n", "While", "Buffer", "(Buffer",
+            "Package", "(Package", "IRQ", "IRQNoFlags", "ResourceTemplate", "(ResourceTemplate", "Interrupt",
+            "GpioInt", "GpioIo", "StartDependentFn", "StartDependentFnNoPri", "Processor", "PowerResource",
+            "DMA", "(DMA", "IndexField", "ThermalZone"
+        ):
             if not is_string:
                 stack.append(None)
 
@@ -159,42 +72,27 @@ def get_content(dsdt_content:str, target: str):
             # Compare current path to target path
             path = ''
             for item in stack:
-                if item:
-                    if item[0] == 'Scope':
-                        if item[1].startswith('\\'):
-                            path = item[1]
+                if item is not None:
+                    _item_ = list(item)
+                    if _item_[0] == 'Scope':
+                        if _item_[1].startswith('\\'):
+                            path = _item_[1]
+                        elif path == '':
+                            path = '\\' + _item_[1]
                         else:
-                            path = '\\' + item[1]
-                    elif item[0] == 'Device':
+                            path = path + '.' + _item_[1]
+                    elif _item_[0] in ('Device', 'Method', 'Field'):
                         if stack.index(item) != 1:
                             path += '.'
                         else:
                             path = '\\'
-                        path += item[1]
-                    elif item[0] == 'Method':
-                        if stack.index(item) != 1:
-                            path += '.'
-                        else:
-                            path = '\\'
-                        path += item[1]
-                    elif item[0] == 'Field':
-                        if stack.index(item) != 1:
-                            path += '.'
-                        else:
-                            path = '\\'
-                        path += item[1]
-                    elif item[0] == 'IndexField':
-                        if stack.index(item) != 1:
-                            path += '.'
-                        else:
-                            path = '\\'
-                        path += item[1]
-                    elif item[0] == 'ThermalZone':
-                        if stack.index(item) != 1:
-                            path += '.'
-                        else:
-                            path = '\\'
-                        path += item[1]
+                        if _item_[1].startswith('\\'):
+                            path = ''
+                        elif _item_[1].startswith('^'):
+                            path = '.'.join(path.split('.')[:-2]) + '.'
+                            _item_[1] = _item_[
+                                1].replace('^', '')
+                        path += _item_[1]
             if path == target:
                 # If match target
                 bracket_stack = []
@@ -211,7 +109,7 @@ def get_content(dsdt_content:str, target: str):
     return content
 
 
-def search(dsdt_content:str, target:str):
+def search(dsdt_splited: list, target: str):
     '''
     Find path by given word, and return content of that path
 
@@ -221,41 +119,50 @@ def search(dsdt_content:str, target:str):
 
     @return: content(dict) - {"path": "content"}
     '''
-    dsdt_splited = split_dsdt(dsdt_content)
+    if VERBOSE:
+        print("Into: search(), getting %s" % target)
+    #dsdt_splited = split_dsdt(dsdt_content)
     stack = []
     path_list = []  # Find path by word
-    is_string = False
+    is_string = False  # If key word in string?
     for i in range(0, len(dsdt_splited)):
         word = dsdt_splited[i]
         if target in dsdt_splited[i]:
-            if target != dsdt_splited[i] and not re.match('\\(*"?%s,?"?\\)*$' % target, 
-                dsdt_splited[i]) and not re.match('.*\\.%s' % target, dsdt_splited[i]):
+            if target != dsdt_splited[i] and not re.match('\\(*"?%s,?"?\\)*$' % target,
+                                                          dsdt_splited[i]) and not re.match('.*\\.%s' % target, dsdt_splited[i]):
                 # 跳过非该变量名结尾的情况
                 continue
             path = ''
             for item in stack:
-                if item:
-                    if item[0] == 'Scope':
-                        if item[1].startswith('\\'):
-                            path = item[1]
+                if item is not None:
+                    if type(item) is tuple:
+                        _item_ = list(item)
+                    else:
+                        _item_ = item
+                    if _item_[0] == 'Scope':
+                        if _item_[1].startswith('\\'):
+                            path = _item_[1]
+                        elif path == '':
+                            path = '\\' + _item_[1]
                         else:
-                            path = '\\' + item[1]
-                    elif item[0] == 'Device':
+                            path = path + '.' + _item_[1]
+                    elif _item_[0] in ('Device', 'Method'):
                         if stack.index(item) != 1:
                             path += '.'
                         else:
                             path = '\\'
-                        path += item[1]
-                    elif item[0] == 'Method':
-                        if stack.index(item) != 1:
-                            path += '.'
-                        else:
-                            path = '\\'
-                        path += item[1]
+                        if _item_[1].startswith('\\'):
+                            path = ''
+                        elif _item_[1].startswith('^'):
+                            path = '.'.join(path.split('.')[:-2]) + '.'
+                            _item_[1] = _item_[
+                                1].replace('^', '')
+                        path += _item_[1]
                     elif item[0] == "Field":
                         # avoid searching Field
-                        path = None
-            if path:
+                        path = ''
+
+            if path != '':
                 path_list.append(path)
 
         if '"' in dsdt_splited[i]:
@@ -268,115 +175,26 @@ def search(dsdt_content:str, target:str):
             if not is_string:
                 stack.append("DefinitionBlock")
 
-        elif dsdt_splited[i] == "Field":
+        elif dsdt_splited[i] in ("Field", "Scope", "Method", "Device"):
             try:
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
+                name = re.findall(r'\((.*)[,\)]', dsdt_splited[i+1])[0]
             except IndexError:
                 continue
-            stack.append(("Field", name))
+            stack.append((dsdt_splited[i], name))
 
-        elif dsdt_splited[i] == "IndexField":
-            try:
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-            except IndexError:
-                continue
-            stack.append(("IndexField", name))
-
-        elif dsdt_splited[i] == "Scope":
-            try:
-                path = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-            except IndexError:
-                continue
-            stack.append(("Scope", path))
-
-        elif dsdt_splited[i] == "Method":
-            try:
-                name = re.findall(r'\((.*),', dsdt_splited[i+1])[0]
-            except IndexError:
-                continue
-            stack.append(("Method", name))
-
-        elif dsdt_splited[i] == "Device":
-            try:
-                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-            except IndexError:
-                continue
-            stack.append(("Device", name))
-
-        elif dsdt_splited[i] == "ThermalZone":
-            try:
-                name = re.findall(r'\((.*)\)', dsdt_splited[i+1])[0]
-            except IndexError:
-                continue
-            stack.append(("ThermalZone", name))
-
-        elif dsdt_splited[i] in ("If", "(If"):
+        elif dsdt_splited[i] in (  # Ignore list
+            "If", "(If", "Else\n", "ElseIf", "Switch", "Case", "Default\n", "While", "Buffer", "(Buffer",
+            "Package", "(Package", "IRQ", "IRQNoFlags", "ResourceTemplate", "(ResourceTemplate", "Interrupt",
+            "GpioInt", "GpioIo", "StartDependentFn", "StartDependentFnNoPri", "Processor", "PowerResource",
+            "DMA", "(DMA", "ThermalZone", "IndexField"
+        ):
             if not is_string:
                 stack.append(None)
-        elif dsdt_splited[i] == "Else\n":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "ElseIf":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Switch":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Case":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Default\n":
-            # don't remove that \n
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "While":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("Buffer", "(Buffer"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("Package", "(Package"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "IRQ":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "IRQNoFlags":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("ResourceTemplate", "(ResourceTemplate"):
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Interrupt":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "GpioInt":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "GpioIo":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "StartDependentFn":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "StartDependentFnNoPri":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "Processor":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] == "PowerResource":
-            if not is_string:
-                stack.append(None)
-        elif dsdt_splited[i] in ("DMA", "(DMA"):
-            if not is_string:
-                stack.append(None)
-
         elif "}" in dsdt_splited[i]:
             if not is_string:
                 stack.pop()
-        
+
     content = {}
     for path in path_list:
-        content[path] = get_content(dsdt_content, path)
+        content[path] = get_content(dsdt_splited, path)
     return content

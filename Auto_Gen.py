@@ -39,7 +39,7 @@ class AutoGen:
         self.filepath = filepath
         self.clean_out()
         self.split_dsdt()
-        self.EC_content = get_content.search(self.dsdt_content, '"PNP0C09"')
+        self.EC_content = get_content.search(self.dsdt_splited, '"PNP0C09"')
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
@@ -62,7 +62,7 @@ class AutoGen:
         self.dsdt_content = re.sub(r'//.*', '', self.dsdt_content)
         # Remove "External" declaration
         self.dsdt_content = re.sub(
-            r'External \(.*Obj\)\n', "", self.dsdt_content)
+            r'External.*\n', "", self.dsdt_content)
         # Remove "Firmware Error" that generated within disassambling
         self.dsdt_content = re.sub(
             r'Firmware Error.*\n', "", self.dsdt_content)
@@ -79,6 +79,12 @@ class AutoGen:
                 dsdt_splitline[i].strip()
             self.dsdt_content = '\n'.join(dsdt_splitline)
         self.dsdt_splited = self.dsdt_content.split(' ')
+        __length__ = len(self.dsdt_splited)
+        for i in range(0, __length__):
+            # remove spaces
+            i = __length__ - i - 1
+            if self.dsdt_splited[i] == '':
+                self.dsdt_splited.pop(i)
 
     def find_OperationRegion(self):
         '''
@@ -129,7 +135,7 @@ class AutoGen:
         for OR in self.OR_info:
             OR["field_unit"] = []
             OR_path = OR["path"]+'.'+OR["name"]
-            content = get_content.get_content(self.dsdt_content, OR_path)
+            content = get_content.get_content(self.dsdt_splited, OR_path)
             for field in content.split("}")[:-1]:
                 field = field.split('{')[1]  # Remove field header
                 store_flag = False  # Is there any field that larger than 16 bits in this method?
@@ -223,17 +229,20 @@ class AutoGen:
         '''
         Getting method content by unit fields which is going to be patched. And patch each method returned.
         '''
+        if VERBOSE:
+            print("\nInto: patch_method().")
         self.method = {}
         for OR in self.OR_info:
             # Getting method content
             for unit in OR["field_unit"]:
-                result = get_content.search(self.dsdt_content, unit["name"])
+                result = get_content.search(self.dsdt_splited, unit["name"])
                 for name in result:
                     if result[name].split()[0] != "Method":
                         # Ignore content which is not Method
                         continue
                     scope = '.'.join(name.split('.')[:-1])
-                    if scope == "":
+                    method = name.split('.')[-1]
+                    if scope == "" or method.startswith('\\'):
                         # Handle method like "Method (\WAK)"
                         scope = "\\"
                     try:
@@ -252,177 +261,195 @@ class AutoGen:
             # Patching method
             for scope in self.method:
                 for method in self.method[scope]:
-                    lines = self.method[scope][method]["content"].splitlines()
+                    method_content = self.method[scope][method]["content"]
                     if VERBOSE:
                         print("\n%s\n| Patching: %s |\n%s" % (
                             '='*(14+len(method)), method, '='*(14+len(method))))
                     for unit in OR["field_unit"]:
+                        lines = method_content.splitlines()
                         if VERBOSE:
                             print("Parsing", unit)
                         unit_path = '.'.join(unit['OR_path'].split('.')[:-1])
-                        if unit_path in scope:
-                            # Patch field writing, e.g. UNIT = xxxx
-                            reserve = re.findall(
-                                "([^\.])%s = (\\w+)" % unit['name'], self.method[scope][method]["content"])
-                            for item in reserve:
-                                for line in lines:
-                                    target = "%s%s = %s" % (
-                                        item[0], unit['name'], item[1])
-                                    if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], OR['WECB'],
-                                                                           unit["offset"] + OR["offset"], unit["size"], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
 
-                            # Patch field writing, e.g. Store (xxxx, UNIT)
-                            reserve = re.findall("Store \\((\\w+), %s\\)" % unit['name'],
-                                                 self.method[scope][method]["content"])
-                            for item in reserve:
-                                for line in lines:
-                                    target = "Store (%s, %s)" % (
-                                        item, unit['name'])
-                                    if target in line:
-                                        replace = "%s (0x%X, %s, %s)" % (OR['WECB'],
-                                                                         unit["offset"] + OR["offset"], unit["size"], item)
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
+                        # Patch field writing, e.g. UNIT = xxxx
+                        reserve = re.findall(
+                            "([\t \(]*)%s = (.*)" % unit['name'], method_content)
+                        for item in reserve:
+                            target = "%s%s = %s" % (
+                                item[0], unit['name'], item[1])
+                            for line in lines:
+                                if target in line:
+                                    replace = "%s%s (0x%X, %s, %s)" % (
+                                        item[0], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit['name']
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
 
-                            # TODO: Patch field writing, e.g. ECWT (data, RefOf (UNIT)) to WECB(offset, size, data)
-                            reserve = re.findall("(.*)ECWT \((.*), RefOf \(%s\)\)(.*)" % unit['name'],
-                                                 self.method[scope][method]['content'])
-                            for item in reserve:
-                                for line in lines:
-                                    target = '%sECWT (%s, RefOf (%s))%s' % (
-                                        item[0], item[1], unit['name'], item[2])
-                                    if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (
-                                            item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]['content'] = self.method[scope][method]['content'].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
+                        # Patch field writing, e.g. Store (xxxx, UNIT)
+                        reserve = re.findall(
+                            "Store \\((\\w+), %s\\)" % unit['name'], method_content)
+                        for item in reserve:
+                            target = "Store (%s, %s)" % (
+                                item, unit['name'])
+                            for line in lines:
+                                if target in line:
+                                    replace = "%s (0x%X, %s, %s)" % (
+                                        OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item)
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit['name']
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
 
-                            # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = RECB(offset, size)
-                            reserve = re.findall("(.*)ECRD \(RefOf \(%s\)\)(.*)" % unit['name'],
-                                                 self.method[scope][method]['content'])
-                            for item in reserve:
-                                for line in lines:
-                                    target = '%sECRD (RefOf (%s))%s' % (
-                                        item[0], unit['name'], item[1])
-                                    if target in line:
-                                        replace = '%s%s (0x%X, %s)%s' % (
-                                            item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
+                        # Patch field writing, e.g. ECWT (data, RefOf (UNIT)) to WECB(offset, size, data)
+                        reserve = re.findall(
+                            "(.*)ECWT \((.*), RefOf \(%s\)\)(.*)" % unit['name'], method_content)
+                        for item in reserve:
+                            target = '%sECWT (%s, RefOf (%s))%s' % (
+                                item[0], item[1], unit['name'], item[2])
+                            for line in lines:
+                                if target in line:
+                                    replace = "%s%s (0x%X, %s, %s)" % (
+                                        item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit['name']
+                                    method_content = self.method[scope][method]['content'] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
 
-                            # Patch field reading, e.g. xxxx = UNIT
-                            reserve = re.findall("(.*[^\.a-zA-Z])%s([^a-zA-Z0-9\.].*)" % unit['name'],
-                                                 self.method[scope][method]['content'])
-                            for item in reserve:
+                        # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = RECB(offset, size)
+                        reserve = re.findall(
+                            "(.*)ECRD \(RefOf \(%s\)\)(.*)" % unit['name'], method_content)
+                        for item in reserve:
+                            target = '%sECRD (RefOf (%s))%s' % (
+                                item[0], unit['name'], item[1])
+                            for line in lines:
+                                if target in line:
+                                    replace = '%s%s (0x%X, %s)%s' % (
+                                        item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit['name']
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
+
+                        # Patch field reading, e.g. xxxx = UNIT
+                        reserve = re.findall(
+                            "(.*[^\.a-zA-Z/])%s([^a-zA-Z0-9\.].*)" % unit['name'], method_content)
+                        for item in reserve:
+                            if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
+                                continue  # stop patching method that have the same name as fieldunit
+                            target = item[0] + unit['name'] + item[1]
+                            for line in lines:
+                                if target in line:
+                                    replace = '%s%s (0x%X, %s)%s' % (
+                                        item[0], OR['RECB'], unit['offset'] + OR["offset"], unit['size'], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit['name']
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
+
+                        # Patch field writing, e.g. EC0.UNIT = xxxx
+                        reserve = re.findall(
+                            "(.*%s\.)%s = (\\w+)" % (unit['OR_path'].split('.')[-2], unit['name']), method_content)
+                        for item in reserve:
+                            target = "%s%s = %s" % (
+                                item[0], unit['name'], item[1])
+                            for line in lines:
+                                if target in line:
+                                    replace = "%s%s (0x%X, %s, %s)" % (
+                                        item[0], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s.%s' % (unit_path, unit['name'])
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
+
+                        # Patch field writing, e.g. Store (xxxx, EC0.UNIT)
+                        reserve = re.findall(
+                            "Store \\((\\w+), (.*%s.)%s\\)" % (
+                                unit['OR_path'].split('.')[-2], unit['name']
+                            ), method_content)
+                        for item in reserve:
+                            target = "Store (%s, %s%s)" % (
+                                item[0], item[1], unit['name'])
+                            for line in lines:
+                                if target in line:
+                                    replace = "%s%s (0x%X, %s, %s)" % (
+                                        item[1], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[0])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s.%s' % (unit_path, unit['name'])
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
+
+                        # Patch field writing, e.g. ECWT (data, RefOf (EC0.UNIT)) to WECB(offset, size, data)
+                        reserve = re.findall(
+                            "(.*)ECWT \((.*), RefOf \((.*%s\.)%s\)\)(.*)" % (
+                                unit['OR_path'].split('.')[-2], unit['name']
+                            ), method_content)
+                        for item in reserve:
+                            target = '%sECWT (%s, RefOf (%s%s))%s' % (
+                                item[0], item[1], item[2], unit['name'], item[3])
+                            for line in lines:
+                                if target in line:
+                                    replace = "%s%s (0x%X, %s, %s)" % (
+                                        item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s.%s' % (unit_path, unit['name'])
+                                    method_content = self.method[scope][method]['content'] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
+
+                        # Patch field reading, e.g. xxxx = EC0.ECRD (RefOf (EC0.UNIT)) to xxxx = B1B2 (ECRD (RefOf (UNI0)), ECRD (RefOf (UNI1)))
+                        reserve = re.findall(
+                            "(.*)ECRD \(RefOf \((.*%s\.)%s\)\)(.*)" % (
+                                unit['OR_path'].split('.')[-2], unit['name']
+                            ), method_content)
+                        for item in reserve:
+                            target = '%sECRD (RefOf (%s%s))%s' % (
+                                item[0], item[1], unit['name'], item[2])
+                            for line in lines:
+                                if target in line:
+                                    replace = '%s%s (0x%X, %s)%s' % (
+                                        item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s.%s' % (unit_path, unit['name'])
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
+
+                        # Patch field reading, e.g. xxxx = EC0.UNIT
+                        reserve = re.findall(
+                            "(.*%s\.)%s([\) ]*)" % (
+                                unit['OR_path'].split('.')[-2], unit['name']
+                            ), method_content)
+                        for item in reserve:
+                            target = item[0] + unit['name'] + item[1]
+                            for line in lines:
                                 if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
                                     continue  # stop patching method that have the same name as fieldunit
-                                for line in lines:
-                                    target = item[0] + unit['name'] + item[1]
-                                    if target in line:
-                                        replace = '%s%s (0x%X, %s)%s' % (item[0], OR['RECB'],
-                                                                         unit['offset'] + OR["offset"], unit['size'], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
-
-                        else:
-                            # Patch field writing, e.g. EC0.UNIT = xxxx
-                            reserve = re.findall("(.*%s\.)%s = (\\w+)" % (unit['OR_path'].split('.')[-2], unit['name']),
-                                                 self.method[scope][method]["content"])
-                            for item in reserve:
-                                for line in lines:
-                                    target = "%s%s = %s" % (
-                                        item[0], unit['name'], item[1])
-                                    if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (item[0], OR['WECB'],
-                                                                           unit["offset"] + OR["offset"], unit["size"], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
-
-                            # Patch field writing, e.g. Store (xxxx, UNIT)
-                            reserve = re.findall("Store \\((\\w+), (.*%s.)%s\\)" % (unit['OR_path'].split('.')[-2], unit['name']),
-                                                 self.method[scope][method]["content"])
-                            for item in reserve:
-                                for line in lines:
-                                    target = "Store (%s, %s%s)" % (
-                                        item[0], item[1], unit['name'])
-                                    if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (
-                                            item[1], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[0])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
-
-                            # TODO: Patch field writing, e.g. ECWT (data, RefOf (UNIT)) to WECB(offset, size, data)
-                            reserve = re.findall("(.*)ECWT \((.*), RefOf \((.*%s\.)%s\)\)(.*)" % (unit['OR_path'].split('.')[-2], unit['name']),
-                                                 self.method[scope][method]['content'])
-                            for item in reserve:
-                                for line in lines:
-                                    target = '%sECWT (%s, RefOf (%s%s))%s' % (
-                                        item[0], item[1], item[2], unit['name'], item[3])
-                                    if target in line:
-                                        replace = "%s%s (0x%X, %s, %s)" % (
-                                            item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]['content'] = self.method[scope][method]['content'].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
-
-                            # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = B1B2 (ECRD (RefOf (UNI0)), ECRD (RefOf (UNI1)))
-                            reserve = re.findall("(.*)ECRD \(RefOf \((.*%s\.)%s\)\)(.*)" % (unit['OR_path'].split('.')[-2], unit['name']),
-                                                 self.method[scope][method]['content'])
-                            for item in reserve:
-                                for line in lines:
-                                    target = '%sECRD (RefOf (%s%s))%s' % (
-                                        item[0], item[1], unit['name'], item[2])
-                                    if target in line:
-                                        replace = '%s%s (0x%X, %s)%s' % (
-                                            item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
-
-                            # Patch field reading, e.g. xxxx = EC0.UNIT
-                            reserve = re.findall("(.*%s\.)%s([^a-zA-Z0-9\.].*)" % (unit['OR_path'].split('.')[-2], unit['name']),
-                                                 self.method[scope][method]['content'])
-                            for item in reserve:
-                                for line in lines:
-                                    if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
-                                        continue  # stop patching method that have the same name as fieldunit
-                                    target = item[0] + unit['name'] + item[1]
-                                    if target in line:
-                                        replace = '%s%s (0x%X, %s)%s' % (item[0], OR['RECB'],
-                                                                         unit['offset'] + OR["offset"], unit['size'], item[1])
-                                        replace = line.replace(
-                                            target, replace) + ' // %s.%s' % (unit_path, unit['name'])
-                                        self.method[scope][method]["content"] = self.method[scope][method]["content"].replace(
-                                            line, replace)
-                                self.method[scope][method]['modified'] = True
+                                if target in line:
+                                    replace = '%s%s (0x%X, %s)%s' % (item[0], OR['RECB'],
+                                                                     unit['offset'] + OR["offset"], unit['size'], item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s.%s' % (unit_path, unit['name'])
+                                    method_content = self.method[scope][method]["content"] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self.method[scope][method]['modified'] = True
 
     def patch_PTSWAK(self):
         '''
@@ -513,11 +540,18 @@ class AutoGen:
                     self.method[scope][method]['content']).groups()
 
                 # Insert if _OSI at the beginning
+                self.method[scope][method]['content'] = self.method[scope][method]["content"].replace(
+                    "Method (%s, %s, %s)" % (
+                        method_info[0], method_info[1], method_info[2]),
+                    "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
+                        method_info[0], method_info[1], method_info[2]),
+                )
+                '''
                 self.method[scope][method]["content"] = re.sub(
                     'Method \((\\\?[\w\.]+), (\d+), (NotSerialized|Serialized)\)',
                     "Method (%s, %s, %s) \n{ \nIf (_OSI (\"Darwin\"))" % (
                         method_info[0], method_info[1], method_info[2]),
-                    self.method[scope][method]["content"])
+                    self.method[scope][method]["content"])'''
 
                 for index in range(0, len(self.method[scope][method]["content"])):
                     if "{" in self.method[scope][method]['content'][index]:
@@ -547,7 +581,7 @@ class AutoGen:
             Disable HP laptops' ACEL device
             '''
             print("Patching ACEL...")
-            content = get_content.search(self.dsdt_content, "(ACEL)")
+            content = get_content.search(self.dsdt_splited, "(ACEL)")
             for dev in content:
                 if dev not in self.method:
                     self.method[dev] = {}
@@ -805,11 +839,13 @@ def parse_args():
             show_help()
         if '-v' in arg:
             VERBOSE = True
+            get_content.set_verbose(True)
         if '-F' in arg or '--force' in arg:
             FORCE = True
         if '-debug' in arg:
             VERBOSE = True
             DEBUG = True
+            get_content.set_debug(True)
         if '.dsl' in arg:
             filename = arg
             filepath = os.path.abspath(filename)

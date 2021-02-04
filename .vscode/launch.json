@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT-雷神911air.dsl"
+                "Sample/DSDT_Lenovo-W541.dsl"
             ]
         }
     ]
