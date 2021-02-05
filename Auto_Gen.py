@@ -265,8 +265,10 @@ class AutoGen:
                     if VERBOSE:
                         print("\n%s\n| Patching: %s |\n%s" % (
                             '='*(14+len(method)), method, '='*(14+len(method))))
+                        if 'GCMD' in method:
+                            print('trigger')
                     for unit in OR["field_unit"]:
-                        lines = method_content.splitlines()
+                        it_lines = iter(method_content.splitlines())
                         if VERBOSE:
                             print("Parsing", unit)
                         unit_path = '.'.join(unit['OR_path'].split('.')[:-1])
@@ -277,7 +279,7 @@ class AutoGen:
                         for item in reserve:
                             target = "%s%s = %s" % (
                                 item[0], unit['name'], item[1])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = "%s%s (0x%X, %s, %s)" % (
                                         item[0], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[1])
@@ -294,7 +296,7 @@ class AutoGen:
                         for item in reserve:
                             target = "Store (%s, %s)" % (
                                 item, unit['name'])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = "%s (0x%X, %s, %s)" % (
                                         OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item)
@@ -311,7 +313,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECWT (%s, RefOf (%s))%s' % (
                                 item[0], item[1], unit['name'], item[2])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = "%s%s (0x%X, %s, %s)" % (
                                         item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
@@ -328,7 +330,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECRD (RefOf (%s))%s' % (
                                 item[0], unit['name'], item[1])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = '%s%s (0x%X, %s)%s' % (
                                         item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
@@ -346,7 +348,7 @@ class AutoGen:
                             if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
                             target = item[0] + unit['name'] + item[1]
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = '%s%s (0x%X, %s)%s' % (
                                         item[0], OR['RECB'], unit['offset'] + OR["offset"], unit['size'], item[1])
@@ -363,7 +365,7 @@ class AutoGen:
                         for item in reserve:
                             target = "%s%s = %s" % (
                                 item[0], unit['name'], item[1])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = "%s%s (0x%X, %s, %s)" % (
                                         item[0], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[1])
@@ -382,7 +384,7 @@ class AutoGen:
                         for item in reserve:
                             target = "Store (%s, %s%s)" % (
                                 item[0], item[1], unit['name'])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = "%s%s (0x%X, %s, %s)" % (
                                         item[1], OR['WECB'], unit["offset"] + OR["offset"], unit["size"], item[0])
@@ -401,7 +403,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECWT (%s, RefOf (%s%s))%s' % (
                                 item[0], item[1], item[2], unit['name'], item[3])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = "%s%s (0x%X, %s, %s)" % (
                                         item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
@@ -420,7 +422,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECRD (RefOf (%s%s))%s' % (
                                 item[0], item[1], unit['name'], item[2])
-                            for line in lines:
+                            for line in it_lines:
                                 if target in line:
                                     replace = '%s%s (0x%X, %s)%s' % (
                                         item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
@@ -438,7 +440,7 @@ class AutoGen:
                             ), method_content)
                         for item in reserve:
                             target = item[0] + unit['name'] + item[1]
-                            for line in lines:
+                            for line in it_lines:
                                 if "Method (" in item[0] or "Device (" in item[0] or "Scope (" in item[0]:
                                     continue  # stop patching method that have the same name as fieldunit
                                 if target in line:
