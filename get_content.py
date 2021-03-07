@@ -1,5 +1,4 @@
 import re
-from typing import Tuple
 
 VERBOSE = False
 DEBUG = False

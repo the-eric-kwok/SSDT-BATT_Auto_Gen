@@ -34,3 +34,52 @@
 - [ ] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）
 - [ ] 双电池补丁
 - [ ] External 声明添加
+
+- [ ] ACEL.ADJT 中
+    ```assembly
+    ElseIf (LNotEqual (CNST, Zero))
+    {
+        Store (Zero, CNST)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x40)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x36, One)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x37, 0x50)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x34, 0x7F)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x24, 0x02)
+        Store (One, ^^LPCB.EC0.PLGS)
+    }
+    ```
+    改为
+    ```assembly
+    ElseIf (LNotEqual (CNST, Zero))
+    {
+        Store (Zero, CNST)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x36, One)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x37, 0x50)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x34, 0x7F)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x24, 0x02)
+        Store (One, ^^LPCB.EC0.PLGS)
+        ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x40)
+}
+    ```
+
+- [ ] BAT0._BST 中删除
+    ```
+    If (LEqual (BRTE, Zero))
+    {
+        Store (0xFFFFFFFF, Index (PBST, One))
+    }
+    ```
+
+- [ ] FBST 设备
+    ```
+    into method label FBST code_regex If\s\(CHGS\s\(Zero\)\)[\s]+\{[\s]+Store\s\(0x02,\sLocal0\)[\s]+\}[\s]+Else[\s]+\{[\s]+Store\s\(One,\sLocal0\)[\s]+\} replaceall_matched begin
+    If (CHGS (Zero))\n
+    {\n
+    Store (0x02, Local0)\n
+    }\n
+    Else\n
+    {\n
+    Store (Zero, Local0)\n
+    }
+    end;
+```

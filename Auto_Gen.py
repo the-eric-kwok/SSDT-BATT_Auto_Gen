@@ -46,6 +46,7 @@ class AutoGen:
         self.patch_PTSWAK()
         self.insert_osi()
         self.special_devices()
+        # self.dual_battery() #TODO
         self.generate_comment()
         self.assemble()
         self.re_indent()
@@ -598,7 +599,16 @@ class AutoGen:
                 inp = input()
                 if inp == 'yes' or inp == 'y':
                     patch_ACEL(self)
-            patch_ACEL(self)
+            else:
+                patch_ACEL(self)
+
+    def dual_battery(self):
+        # TODO: 重写 search 方法，使用范围缩小查找法，使其支持查找中间有空格的关键词
+        content = get_content.search(self.dsdt_splited, "Notify (BAT0")
+        content += get_content.search(self.dsdt_splited, "Notify (BAT1")
+        content += get_content.search(self.dsdt_splited, "Notify (BAT2")
+        content += get_content.search(self.dsdt_splited, "Notify (BAT3")
+        pass
 
     def generate_comment(self):
         # Find mutex and set them to zero

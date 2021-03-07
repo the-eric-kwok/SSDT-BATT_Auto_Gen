@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT_Lenovo-W541.dsl"
+                "Sample/DSDT_ThinkPadW530_多电池.dsl"
             ]
         }
     ]
