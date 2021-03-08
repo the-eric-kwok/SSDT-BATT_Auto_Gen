@@ -19,7 +19,49 @@
 - [x] 删除写入Field相关的内容（因为不需要进行变量拆分）
 - [x] FIXME 修复 FieldUnit 变量与 Method 重名时错误替换的问题
 - [x] 双电池设备警告并退出执行
-- [x] 惠普 ACEL 设备禁用
+- [ ] ~~惠普 ACEL 设备禁用~~ ACEL.ADJT 调整
+    ```
+    Method (ADJT, 0, Serialized)
+    {
+        If (_STA ())
+        {
+            If ((^^LPCB.EC0.ECOK == One))
+            {
+                Local0 = ^^LPCB.EC0.SW2S /* \_SB_.PCI0.LPCB.EC0_.SW2S */
+            }
+            Else
+            {
+                Local0 = PWRS /* \PWRS */
+            }
+
+            If (((^^^LID0._LID () == Zero) && (Local0 == Zero)))
+            {
+                If ((CNST != One))
+                {
+                    CNST = One
+                    ^^LPCB.EC0.PLGS = Zero
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x24, Zero)
+                    Sleep (0x0BB8)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x36, 0x14)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x37, 0x10)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x34, 0x2A)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x20)
+                }
+            }
+            ElseIf ((CNST != Zero))
+            {
+                CNST = Zero
+                //^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x40)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x36, One)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x37, 0x50)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x34, 0x7F)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x24, 0x02)
+                ^^LPCB.EC0.PLGS = One
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x40)
+            }
+        }
+    }
+    ```
 - [x] 同一个 Scope 的方法合并
 - [x] Mutex 置零补丁生成
 - [x] 重命名补丁生成
@@ -34,3 +76,4 @@
 - [ ] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）
 - [ ] 双电池补丁
 - [ ] External 声明添加
+- [ ] 
