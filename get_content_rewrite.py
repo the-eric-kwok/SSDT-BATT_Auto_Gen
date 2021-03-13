@@ -43,12 +43,15 @@ def to_code_blocks(dsdt_content):
                 rewind = dsdt_content[j] + rewind
                 for keyword in keyword_list:
                     if keyword in rewind:
-                        # append(offset, code_block_type)
                         inside_bracket = re.match(
                             "%s\s?\((.*)\)" % keyword, rewind)[1]
-                        stack.append((j, keyword, inside_bracket))
+                        start_offset = j
+                        block_type = keyword
+                        stack.append(
+                            (start_offset, block_type, inside_bracket))
                         break
                 else:
+                    # Only executed when "for" is not broke down
                     j -= 1
                     if j < 0:
                         raise RuntimeError(
@@ -70,6 +73,7 @@ def to_code_blocks(dsdt_content):
             content = dsdt_content[block_info[0]:i+1]
             block_type = block_info[1]
             if block_type in abandon_list:
+                # Code blocks such as "if" "else" are abandoned
                 continue
             inside_bracket = block_info[2]
             get_name = {
@@ -80,7 +84,7 @@ def to_code_blocks(dsdt_content):
                 "OperationRegion": parsing_OperationRegion,
             }
             name = get_name[block_type](inside_bracket)
-            # TODO: 加上路径解析
+            # TODO: 加上路径解析?
             block_info = {
                 'name': name,
                 'type': block_type,
