@@ -16,104 +16,148 @@ def set_debug(flag):
     VERBOSE = flag
 
 
-def to_code_blocks(dsdt_content):
-    '''
-    @param: dsdt_content
-    @return: code_tree
-    '''
-    rang = range(0, len(dsdt_content))
-    keyword_list = {
-        'Method', "Device", "Scope", "OperationRegion", "If", "Else",
-        "Package", "Interrupt", "Resource", "IRQ",
-        "Buffer", "Switch", "Case", "Default", "While",
-        "Gpio", "StartDependentFn", "Processor", "DMA",
-        "ThermalZone", "DefinitionBlock"
-    }
-    approve_list = {
-        "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
-    }
-    abandon_list = keyword_list - approve_list
-    stack = []
-    blocks = []
-    for i in rang:
-        if dsdt_content[i] == '{':
-            j = i - 1
-            rewind = ''
-            while True:
-                rewind = dsdt_content[j] + rewind
-                for keyword in keyword_list:
-                    if keyword in rewind:
-                        try:
-                            inside_bracket = re.match(
-                                "%s\s?\((.*)\)" % keyword, rewind)[1]
-                        except TypeError:
-                            inside_bracket = ''
-                        start_offset = j
-                        block_type = keyword
+class getContent:
+    def __init__(self, dsdt_content):
+        self.blocks = self.to_code_blocks(dsdt_content)
+        self.index()
 
-                        def appendPath(item, current_path):
-                            name = item[2]
-                            if name.startswith('\\'):
-                                return name
-                            elif current_path == '\\':
-                                return current_path + name
-                            return current_path + '.' + name
+    def to_code_blocks(self, dsdt_content):
+        '''
+        @param: dsdt_content
+        @return: code_tree
+        '''
+        rang = range(0, len(dsdt_content))
+        keyword_list = {
+            'Method', "Device", "Scope", "OperationRegion", "If", "Else",
+            "Package", "Interrupt", "Resource", "IRQ",
+            "Buffer", "Switch", "Case", "Default", "While",
+            "Gpio", "StartDependentFn", "Processor", "DMA",
+            "ThermalZone", "DefinitionBlock"
+        }
+        approve_list = {
+            "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
+        }
+        abandon_list = keyword_list - approve_list
+        stack = []
+        blocks = []
+        for i in rang:
+            if dsdt_content[i] == '{':
+                j = i - 1
+                rewind = ''
+                while True:
+                    rewind = dsdt_content[j] + rewind
+                    for keyword in keyword_list:
+                        if keyword in rewind:
+                            try:
+                                inside_bracket = re.match(
+                                    "%s\s?\((.*)\)" % keyword, rewind)[1]
+                            except TypeError:
+                                inside_bracket = ''
+                            start_offset = j
+                            block_type = keyword
 
-                        # get path of code block
-                        path = ''
-                        for item in stack:
-                            if item[1] == 'DefinitionBlock':
-                                path = '\\'
-                            else:
-                                path = appendPath(item, path)
-                        stack.append(
-                            (start_offset, block_type, inside_bracket, path))
-                        break
-                else:
-                    # Only executed when "for" is not broke down
-                    j -= 1
-                    if j < 0:
-                        raise RuntimeError(
-                            "Offset less than zero. Please re-check keyword_list!")
+                            def appendPath(item, current_path):
+                                # TODO: 有几个 ^ 号就 pop 多少次
+                                name = item[2]
+                                if name.startswith('\\'):
+                                    return name
+                                elif current_path == '\\':
+                                    return current_path + name
+                                return current_path + '.' + name
+
+                            # get path of code block
+                            # TODO: deal with Method (^BBNS)
+                            path = ''
+                            for item in stack:
+                                if item[1] == 'DefinitionBlock':
+                                    path = '\\'
+                                else:
+                                    path = appendPath(item, path)
+                            stack.append(
+                                (start_offset, block_type, inside_bracket, path))
+                            break
+                    else:
+                        # Only executed when "for" is not broke down
+                        j -= 1
+                        if j < 0:
+                            raise RuntimeError(
+                                "Offset less than zero. Please re-check keyword_list!")
+                        continue
+                    break
+
+            elif dsdt_content[i] == '}':
+                def getDefinitionBlockName(inside_bracket):
+                    spl = inside_bracket.split(',')
+                    name = spl[1].replace('"', '').strip() + \
+                        '-' + spl[4].replace('"', '').strip()
+                    return name
+
+                block_info = stack.pop()
+                content = dsdt_content[block_info[0]:i+1]
+                block_type = block_info[1]
+                if block_type in abandon_list:
+                    # Code blocks such as "if" "else" are abandoned
                     continue
-                break
+                inside_bracket = block_info[2]
+                get_name = {
+                    "DefinitionBlock": getDefinitionBlockName,
+                    "Method": lambda arg: arg.split(',')[0],
+                    "Scope": lambda arg: arg,
+                    "Device": lambda arg: arg,
+                    "OperationRegion": lambda arg: arg.split(',')[0],
+                }
+                name = get_name[block_type](inside_bracket)
+                if block_info[3] == '':
+                    path = '\\'
+                elif block_info[3] == '\\':
+                    path = '\\' + name
+                else:
+                    path = block_info[3] + '.' + name
+                block_info = {
+                    'name': name,
+                    'type': block_type,
+                    'content': content,
+                    'path': path
+                }
+                blocks.append(block_info)
+        return blocks
 
-        elif dsdt_content[i] == '}':
-            def getDefinitionBlockName(inside_bracket):
-                spl = inside_bracket.split(',')
-                name = spl[1].replace('"', '').strip() + \
-                    '-' + spl[4].replace('"', '').strip()
-                return name
+    def index(self):
+        self.index_block = {}
+        for block in self.blocks:
+            blk_type = block['type']
+            try:
+                self.index_block[blk_type].append(block)
+            except KeyError:
+                self.index_block[blk_type] = []
+                self.index_block[blk_type].append(block)
 
-            block_info = stack.pop()
-            content = dsdt_content[block_info[0]:i+1]
-            block_type = block_info[1]
-            if block_type in abandon_list:
-                # Code blocks such as "if" "else" are abandoned
-                continue
-            inside_bracket = block_info[2]
-            get_name = {
-                "DefinitionBlock": getDefinitionBlockName,
-                "Method": lambda arg: arg,
-                "Scope": lambda arg: arg,
-                "Device": lambda arg: arg,
-                "OperationRegion": lambda arg: arg.split(',')[0],
-            }
-            name = get_name[block_type](inside_bracket)
-            if block_info[3] == '':
-                path = '\\'
-            elif block_info[3] == '\\':
-                path = '\\' + name
+    def getContent(self, path_or_name: str, blk_type=""):
+        '''
+        Return content of given path or name, code block type is optional
+        @param: path_or_name
+        @param: blk_type (optional)
+        '''
+        result = []
+        if blk_type == "":
+            if path_or_name.startswith('\\'):
+                for item in self.blocks:
+                    if item['path'] == path_or_name:
+                        result.append(item)
             else:
-                path = block_info[3] + '.' + name
-            block_info = {
-                'name': name,
-                'type': block_type,
-                'content': content,
-                'path': path
-            }
-            blocks.append(block_info)
-    return blocks
+                for item in self.blocks:
+                    if item['name'] == path_or_name:
+                        result.append(item)
+        else:
+            if path_or_name.startswith('\\'):
+                for item in self.index_block[blk_type]:
+                    if item['path'] == path_or_name:
+                        result.append(item)
+            else:
+                for item in self.index_block[blk_type]:
+                    if item['name'] == path_or_name:
+                        result.append(item)
+        return result
 
 
 def load_file():
@@ -142,4 +186,5 @@ def load_file():
 
 
 if __name__ == '__main__':
-    print(to_code_blocks(load_file()))
+    gc = getContent(load_file())
+    gc.getContent("GPRW", "Method")
