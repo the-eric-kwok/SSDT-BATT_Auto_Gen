@@ -57,32 +57,46 @@ class getContent:
                             block_type = keyword
 
                             def appendPath(item, current_path):
-                                # TODO: 有几个 ^ 号就 pop 多少次
                                 inside_bracket = item[2]
+                                if item[1] in abandon_list:
+                                    return current_path
                                 if item[1] == 'Method':
                                     name = inside_bracket.split(',')[0]
                                 else:
                                     name = inside_bracket
                                 if name.startswith('\\'):
                                     return name
-                                elif name.startswith('^'):
-                                    _stack_ = current_path.split('.')
-                                    for i in range(0, name.count('^')):
-                                        _stack_.pop()
-                                    current_path = '.'.join(_stack_)
-                                    return current_path + name
-                                elif current_path == '\\':
+                                if current_path == '\\':
                                     return current_path + name
                                 return current_path + '.' + name
 
                             # get path of code block
-                            # TODO: deal with Method (^BBNS)
                             path = ''
                             for item in stack:
                                 if item[1] == 'DefinitionBlock':
                                     path = '\\'
                                 else:
                                     path = appendPath(item, path)
+                            if inside_bracket.startswith('^'):
+                                def parseParentPrefix(inside_bracket, block_type, current_path):
+                                    '''
+                                    Deal with contents like `Method (^BN00)`
+                                    '''
+                                    if block_type == 'Method':
+                                        name = inside_bracket.split(',')[0]
+                                    else:
+                                        name = inside_bracket
+                                    _stack_ = current_path.split('.')
+                                    for i in range(0, name.count('^')):
+                                        _stack_.pop()
+                                    path = '.'.join(_stack_)
+                                    if path == '':
+                                        path = '\\'
+                                    # Not sure whether should I remove the ^ in inside_bracket
+                                    #inside_bracket = inside_bracket.replace('^', '')
+                                    return path
+                                if block_type in approve_list:
+                                    path = parseParentPrefix(inside_bracket, block_type, path)
                             stack.append(
                                 (start_offset, block_type, inside_bracket, path))
                             break
@@ -116,7 +130,7 @@ class getContent:
                     "Device": lambda arg: arg,
                     "OperationRegion": lambda arg: arg.split(',')[0],
                 }
-                name = get_name[block_type](inside_bracket)
+                name = get_name[block_type](inside_bracket).replace('^', '').replace('\\', '')
                 if block_info[3] == '':
                     path = '\\'
                 elif block_info[3] == '\\':
