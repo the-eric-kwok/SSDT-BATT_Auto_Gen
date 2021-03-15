@@ -58,9 +58,19 @@ class getContent:
 
                             def appendPath(item, current_path):
                                 # TODO: 有几个 ^ 号就 pop 多少次
-                                name = item[2]
+                                inside_bracket = item[2]
+                                if item[1] == 'Method':
+                                    name = inside_bracket.split(',')[0]
+                                else:
+                                    name = inside_bracket
                                 if name.startswith('\\'):
                                     return name
+                                elif name.startswith('^'):
+                                    _stack_ = current_path.split('.')
+                                    for i in range(0, name.count('^')):
+                                        _stack_.pop()
+                                    current_path = '.'.join(_stack_)
+                                    return current_path + name
                                 elif current_path == '\\':
                                     return current_path + name
                                 return current_path + '.' + name
