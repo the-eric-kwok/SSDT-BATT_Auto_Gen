@@ -8,7 +8,7 @@ import os
 import re
 from multilanguage import *
 import time
-import get_content
+import get_content_rewrite
 from cons_strings import *
 import copy
 
@@ -36,17 +36,19 @@ class AutoGen:
 
     def __init__(self, dsdt_content: str, filepath: str) -> None:
         self.dsdt_content = dsdt_content
+        self.gc = get_content_rewrite.GetContent(dsdt_content)
         self.filepath = filepath
         self.clean_out()
-        self.split_dsdt()
-        self.EC_content = get_content.search(self.dsdt_splited, '"PNP0C09"')
+        # self.split_dsdt()
+        self.EC_path = self.gc.search('PNP0C09')[0]['path']
+        self.EC_content = self.gc.getContent(self.EC_path, 'Device')  # TODO EC_content will be a list
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
         self.patch_PTSWAK()
         self.insert_osi()
         self.special_devices()
-        # self.dual_battery() #TODO
+        # self.dual_battery() #TODO dual battery
         self.generate_comment()
         self.assemble()
         self.re_indent()
@@ -107,7 +109,7 @@ class AutoGen:
                     elif OR_info.group(2) == 'One':
                         offset = 1
                     elif 'Arg' in OR_info.group(2):
-                        continue  # TODO
+                        continue  # TODO ??
                     elif '0x' in OR_info.group(2):
                         offset = int(OR_info.group(2), 16)
                     else:
@@ -136,7 +138,7 @@ class AutoGen:
         for OR in self.OR_info:
             OR["field_unit"] = []
             OR_path = OR["path"]+'.'+OR["name"]
-            content = get_content.get_content(self.dsdt_splited, OR_path)
+            content = self.gc.getContent(OR_path)  # TODO content will be a list
             for field in content.split("}")[:-1]:
                 field = field.split('{')[1]  # Remove field header
                 store_flag = False  # Is there any field that larger than 16 bits in this method?
@@ -236,7 +238,7 @@ class AutoGen:
         for OR in self.OR_info:
             # Getting method content
             for unit in OR["field_unit"]:
-                result = get_content.search(self.dsdt_splited, unit["name"])
+                result = self.gc.search(unit["name"])  # TODO result will be a list
                 for name in result:
                     if result[name].split()[0] != "Method":
                         # Ignore content which is not Method
@@ -584,7 +586,7 @@ class AutoGen:
             Disable HP laptops' ACEL device
             '''
             print("Patching ACEL...")
-            content = get_content.search(self.dsdt_splited, "(ACEL)")
+            content = self.gc.search("(ACEL)")  # TODO content will be a list
             for dev in content:
                 if dev not in self.method:
                     self.method[dev] = {}
@@ -604,10 +606,10 @@ class AutoGen:
 
     def dual_battery(self):
         # TODO: 重写 search 方法，使用范围缩小查找法，使其支持查找中间有空格的关键词
-        content = get_content.search(self.dsdt_splited, "Notify (BAT0")
-        content += get_content.search(self.dsdt_splited, "Notify (BAT1")
-        content += get_content.search(self.dsdt_splited, "Notify (BAT2")
-        content += get_content.search(self.dsdt_splited, "Notify (BAT3")
+        content = self.gc.search("Notify (BAT0")
+        content += self.gc.search("Notify (BAT1")
+        content += self.gc.search("Notify (BAT2")
+        content += self.gc.search("Notify (BAT3")
         pass
 
     def generate_comment(self):
@@ -851,13 +853,13 @@ def parse_args():
             show_help()
         if '-v' in arg:
             VERBOSE = True
-            get_content.set_verbose(True)
+            # get_content_rewrite.set_verbose(True)
         if '-F' in arg or '--force' in arg:
             FORCE = True
         if '-debug' in arg:
             VERBOSE = True
             DEBUG = True
-            get_content.set_debug(True)
+            # get_content_rewrite.set_debug(True)
         if '.dsl' in arg:
             filename = arg
             filepath = os.path.abspath(filename)

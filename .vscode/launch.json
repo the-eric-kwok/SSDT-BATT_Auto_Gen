@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT_ThinkPadW530_多电池.dsl"
+                "Sample/DSDT_ASUS_FX503VD.dsl"
             ]
         }
     ]

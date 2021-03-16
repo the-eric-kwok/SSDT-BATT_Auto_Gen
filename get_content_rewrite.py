@@ -1,27 +1,26 @@
-# TODO: 使用范围缩小定位法重写搜索功能
+# 使用范围缩小定位法重写搜索功能
 import re
 
 VERBOSE = False
 DEBUG = False
 
-
+'''
 def set_verbose(flag):
     global VERBOSE
     VERBOSE = flag
-
-
 def set_debug(flag):
     global VERBOSE, DEBUG
     DEBUG = flag
     VERBOSE = flag
+'''
 
 
 class GetContent:
     def __init__(self, dsdt_content):
-        self.blocks = self.to_code_blocks(dsdt_content)
-        self.index()
+        self.blocks = self.__to_code_blocks__(dsdt_content)
+        self.__index__()
 
-    def to_code_blocks(self, dsdt_content):
+    def __to_code_blocks__(self, dsdt_content):
         '''
         @param: dsdt_content
         @return: code_blocks_tree
@@ -143,7 +142,7 @@ class GetContent:
                 blocks.append(block_info)
         return blocks
 
-    def index(self):
+    def __index__(self):
         self.index_blocks = {}
         for block in self.blocks:
             blk_type = block['type']
@@ -157,11 +156,11 @@ class GetContent:
 
     def getContent(self, target: str, blk_type="") -> list:
         '''
-        Return content of given target (path or name), code block type is optional.
+        Return content of given target (path or name, determined by . or back-slash), code block type is optional.
         This method will not judge the granularity since there won't be two method with the same name in one scope.
 
-        @param: target
-        @param: blk_type (optional)
+        @param: target - Such as '_SB.PCI0' (as a path) or 'AECL' (as a name)
+        @param: blk_type - Could be "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
         @return: result (list)
         '''
         result = []
@@ -174,26 +173,40 @@ class GetContent:
                 if item['name'] == target:
                     result.append(item)
         if len(result) == 0:
-            raise RuntimeError("Terget %s in given block type %s not found!" % (target, blk_type))
+            raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
         return result
 
-    def search(self, target: str, blk_type='') -> list:
+    def search(self, target: str, blk_type='', regex=False, ignorecase=False) -> list:
         '''
         Search target in all blocks, and return matched result in minimal granularity, 
         which is determined by block type. If `blk_type` is empty, method will return the
         minimal granularity in `approve_list` it could find.
 
-        @param: target
-        @param: blk_type
+        @param: target - The keyword to be searched
+        @param: blk_type - Could be "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
         @return: result (list)
         '''
+
         result = []
         for item in self.index_blocks[blk_type]:
-            if target in item['content']:
-                result.append(item)
+            if regex:
+                if ignorecase:
+                    re_sult = re.search(target, item['content'], re.IGNORECASE)
+                    if re_sult:
+                        result.append(item)
+                else:
+                    re_sult = re.search(target, item['content'])
+                    if re_sult:
+                        result.append(item)
+            else:
+                if ignorecase:
+                    if target.lower() in item['content'].lower():
+                        result.append(item)
+                else:
+                    if target in item['content']:
+                        result.append(item)
         min_granularity = []  # path
         for item in result:
-            # if item[1] == blk_type:
             if len(min_granularity) == 0:
                 min_granularity.append(item['path'])
                 continue
@@ -209,11 +222,11 @@ class GetContent:
             if item['path'] not in min_granularity:
                 result.remove(item)
         if len(result) == 0:
-            raise RuntimeError("Terget %s in given block type %s not found!" % (target, blk_type))
+            raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
         return result
 
 def load_file():
-    with open('Sample/DSDT_y700-isk.dsl', 'r') as f:
+    with open('Sample/DSDT_ASUS_FX503VD.dsl', 'r') as f:
         content = f.read()
 
     def clean_out(content):
@@ -239,4 +252,4 @@ def load_file():
 
 if __name__ == '__main__':
     gc = GetContent(load_file())
-    gc.search("PNP0C0A", "Device")
+    gc.getContent("_SB.PCI0.LPCB.EC0")
