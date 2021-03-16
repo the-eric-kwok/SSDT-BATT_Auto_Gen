@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT_ASUS_FX503VD.dsl"
+                "Sample/DSDT_HP-Pavilion-15.dsl"
             ]
         }
     ]

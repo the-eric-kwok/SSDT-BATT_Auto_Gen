@@ -41,7 +41,7 @@ class AutoGen:
         self.clean_out()
         # self.split_dsdt()
         self.EC_path = self.gc.search('PNP0C09')[0]['path']
-        self.EC_content = self.gc.getContent(self.EC_path, 'Device')  # TODO EC_content will be a list
+        self.EC_content = self.gc.getContent(self.EC_path)  # TODO EC_content will be a list
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
@@ -97,25 +97,26 @@ class AutoGen:
             print(
                 "Into: find_OperationRegion(): Finding OperationRegion(s) inside EC scope.")
         EC_content = self.EC_content
-        for dev in EC_content:
+        for block in EC_content:
             OR_list = re.findall(
-                "OperationRegion \\(([A-Z0-9]{2,4}),", EC_content[dev])
+                "OperationRegion \\(([A-Z0-9]{2,4}),", block['content'])
             for OR in OR_list:
                 OR_info = re.search(  # Getting info of OperationRegions by re.group
-                    "OperationRegion \\(%s, ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\\)" % OR, EC_content[dev])
+                    "OperationRegion \\(%s, ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\\)" % OR, block['content'])
                 try:
                     if OR_info.group(2) == 'Zero':
                         offset = 0
                     elif OR_info.group(2) == 'One':
                         offset = 1
                     elif 'Arg' in OR_info.group(2):
-                        continue  # TODO ??
+                        continue  # TODO 处理类似 OperationRegion (NAME, Memory, Arg0, 0x01) 的情况
                     elif '0x' in OR_info.group(2):
                         offset = int(OR_info.group(2), 16)
                     else:
+                        # TODO 处理类似 OperationRegion (ECAD, SystemMemory, GNBF, 0x10) 的情况，GNBF是另一个Unit (FX503VD)
                         offset = OR_info.group(2)
                     self.OR_info.append({
-                        "path": dev,
+                        "path": block['path'],
                         "name": OR,
                         "storage": OR_info.group(1),
                         "offset": offset,
@@ -138,7 +139,11 @@ class AutoGen:
         for OR in self.OR_info:
             OR["field_unit"] = []
             OR_path = OR["path"]+'.'+OR["name"]
-            content = self.gc.getContent(OR_path)  # TODO content will be a list
+            blocks = self.gc.getContent(OR_path)  # TODO content will be a list
+            content = ''
+            for block in blocks:
+                content += block['content'] + '\n'
+            # for block in blocks:
             for field in content.split("}")[:-1]:
                 field = field.split('{')[1]  # Remove field header
                 store_flag = False  # Is there any field that larger than 16 bits in this method?
@@ -151,6 +156,7 @@ class AutoGen:
                         # Skip empty line
                         continue
                     elif "Offset" not in item:
+                        # Parse line such as `ABCD, 8,`
                         item_spl = item.split(',')
                         name = item_spl[0].strip()
                         size = int(item_spl[1].strip())
@@ -163,6 +169,7 @@ class AutoGen:
                             store_flag = True
                         offset_bits += size
                     else:
+                        # Parse line such as `Offset (0x64),`
                         item = item.strip()
                         offset = re.search(r'Offset \((.*)\)', item).group(1)
                         offset_bits = int(offset, 16) * 8
@@ -174,10 +181,10 @@ class AutoGen:
                             # This will generate a new R/W method name
                             letter = random.choice(
                                 '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-                            OR['RE1B'] = 'R1B'+letter
+                            OR['RE1B'] = 'R1B' + letter
                             OR['RECB'] = 'REB' + letter
-                            OR['ERM2'] = 'MEM'+letter
-                            OR['WE1B'] = 'W1B'+letter
+                            OR['ERM2'] = 'MEM' + letter
+                            OR['WE1B'] = 'W1B' + letter
                             OR['WECB'] = 'WRB' + letter
                             if (self.dsdt_content.find(OR['RE1B']) == -1 and OR['RE1B'] not in self.RW_method) \
                                     and (self.dsdt_content.find(OR['RECB']) == -1 and OR['RECB'] not in self.RW_method) \
@@ -206,6 +213,10 @@ class AutoGen:
                         # If OR['storage'] in self.RW_method and not in OR itself
                         # Then copy the read/write method from other OR which has the same storage
                         for _OR_ in self.OR_info:
+                            try:
+                                _OR_['RE1B']
+                            except KeyError:
+                                continue
                             if _OR_['storage'] == OR['storage']:
                                 OR['RE1B'] = _OR_['RE1B']
                                 OR['RECB'] = _OR_['RECB']
@@ -238,28 +249,31 @@ class AutoGen:
         for OR in self.OR_info:
             # Getting method content
             for unit in OR["field_unit"]:
-                result = self.gc.search(unit["name"])  # TODO result will be a list
-                for name in result:
-                    if result[name].split()[0] != "Method":
-                        # Ignore content which is not Method
-                        continue
-                    scope = '.'.join(name.split('.')[:-1])
-                    method = name.split('.')[-1]
+                try:
+                    result = self.gc.search(unit["name"], 'Method')  # TODO result will be a list
+                except RuntimeError:
+                    continue
+                for block in result:
+                    # if result[name].split()[0] != "Method":
+                    # Ignore content which is not Method
+                    # continue
+                    scope = '.'.join(block['path'].split('.')[:-1])
+                    method = block['name']
                     if scope == "" or method.startswith('\\'):
                         # Handle method like "Method (\WAK)"
                         scope = "\\"
                     try:
-                        if name in self.method[scope] or ("EC" not in name and "EC" not in result[name]):
+                        if block['path'] in self.method[scope] or ("EC" not in block['path'] and "EC" not in block['content']):
                             # remove duplicates, and remove fieldunit that not in EC scope
                             continue
                     except KeyError:
-                        if "EC" not in name and "EC" not in result[name]:
+                        if "EC" not in block['path'] and "EC" not in block['content']:
                             # Remove fieldunit that not in EC scope
                             continue
                     if scope not in self.method:
                         self.method[scope] = {}
-                    self.method[scope][name] = {
-                        "content": result[name], "modified": False}
+                    self.method[scope][block['path']] = {
+                        "content": block['content'], "modified": False}
 
             # Patching method
             for scope in self.method:
