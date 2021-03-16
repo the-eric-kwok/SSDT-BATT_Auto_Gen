@@ -165,6 +165,8 @@ class GetContent:
         '''
         result = []
         if target.startswith('\\') or '.' in target:
+            if not target.startswith('\\'):
+                target = '\\' + target
             for item in self.index_blocks[blk_type]:
                 if item['path'] == target:
                     result.append(item)
