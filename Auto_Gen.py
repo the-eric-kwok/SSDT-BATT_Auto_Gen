@@ -100,30 +100,39 @@ class AutoGen:
         for block in EC_content:
             OR_list = re.findall(
                 "OperationRegion \\(([A-Z0-9]{2,4}),", block['content'])
-            for OR in OR_list:
-                OR_info = re.search(  # Getting info of OperationRegions by re.group
-                    "OperationRegion \\(%s, ([a-zA-Z].*), ([a-zA-Z0-9].*), ([a-zA-Z0-9].*)\\)" % OR, block['content'])
-                try:
-                    if OR_info.group(2) == 'Zero':
-                        offset = 0
-                    elif OR_info.group(2) == 'One':
-                        offset = 1
-                    elif 'Arg' in OR_info.group(2):
-                        continue  # TODO 处理类似 OperationRegion (NAME, Memory, Arg0, 0x01) 的情况
-                    elif '0x' in OR_info.group(2):
-                        offset = int(OR_info.group(2), 16)
-                    else:
-                        # TODO 处理类似 OperationRegion (ECAD, SystemMemory, GNBF, 0x10) 的情况，GNBF是另一个Unit (FX503VD)
-                        offset = OR_info.group(2)
-                    self.OR_info.append({
-                        "path": block['path'],
-                        "name": OR,
-                        "storage": OR_info.group(1),
-                        "offset": offset,
-                        "length": OR_info.group(3)
-                    })
-                except AttributeError:
-                    continue
+            for OR_name in OR_list.copy():
+                content = self.gc.getContent(OR_name, "OperationRegion")
+                for item in content.copy():
+                    if 'EC' in item['path']:  # Remove contents that is not in EC
+                        break
+                    content.remove(item)
+                if len(content) == 0:
+                    OR_list.remove(OR_name)
+                    break
+                for item in content:
+                    OR_info = re.search(  # Getting info of OperationRegions by re.group
+                        "OperationRegion\s\(%s,\s([a-zA-Z].*),\s([a-zA-Z0-9].*),\s([a-zA-Z0-9].*)\)" % OR_name, item['content'])
+                    try:
+                        if OR_info.group(2) == 'Zero':
+                            offset = 0
+                        elif OR_info.group(2) == 'One':
+                            offset = 1
+                        elif 'Arg' in OR_info.group(2):
+                            continue  # TODO 处理类似 OperationRegion (NAME, Memory, Arg0, 0x01) 的情况
+                        elif '0x' in OR_info.group(2):
+                            offset = int(OR_info.group(2), 16)
+                        else:
+                            # TODO 处理类似 OperationRegion (ECAD, SystemMemory, GNBF, 0x10) 的情况，GNBF是另一个Unit (FX503VD)
+                            offset = OR_info.group(2)
+                        self.OR_info.append({
+                            "path": block['path'],
+                            "name": OR_name,
+                            "storage": OR_info.group(1),
+                            "offset": offset,
+                            "length": OR_info.group(3)
+                        })
+                    except AttributeError:
+                        continue
         if VERBOSE:
             for item in self.OR_info:
                 print(item)

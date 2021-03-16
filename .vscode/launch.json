@@ -9,7 +9,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-v -debug -F",
-                "Sample/DSDT_HP-Pavilion-15.dsl"
+                "Sample/DSDT_y700-isk.dsl"
             ]
         }
     ]
