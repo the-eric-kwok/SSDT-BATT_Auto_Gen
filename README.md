@@ -1,3 +1,4 @@
+[![time tracker](https://wakatime.com/badge/github/the-eric-kwok/SSDT-BATT_Auto_Gen.svg)](https://wakatime.com/badge/github/the-eric-kwok/SSDT-BATT_Auto_Gen)
 # SSDT-BATT_Auto_Gen
 一个自动从 DSDT 中生成 SSDT-BATT 的 python 脚本
 
