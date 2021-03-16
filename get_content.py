@@ -17,14 +17,9 @@ def set_debug(flag):
 
 def get_content(dsdt_splited: list, target: str):
     '''
-    Getting file content about given target.
-
-    If target is a path, return its content. 
-
+    Getting file content about given target. If target is a path, return its content. 
     @param: dsdt_content(str) - DSDT content
-
     @param: target(str) - device/field/method absolute path
-
     @return: content(str) - file content about that device/field/method
     '''
     if VERBOSE:
@@ -111,11 +106,8 @@ def get_content(dsdt_splited: list, target: str):
 def search(dsdt_splited: list, target: str):
     '''
     Find path by given word, and return content of that path
-
     @param: dsdt_content(str) - DSDT content
-
     @param: target(str) - searching word
-
     @return: content(dict) - {"path": "content"}
     '''
     if VERBOSE:

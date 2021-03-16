@@ -16,7 +16,7 @@ def set_debug(flag):
     VERBOSE = flag
 
 
-class getContent:
+class GetContent:
     def __init__(self, dsdt_content):
         self.blocks = self.to_code_blocks(dsdt_content)
         self.index()
@@ -24,20 +24,17 @@ class getContent:
     def to_code_blocks(self, dsdt_content):
         '''
         @param: dsdt_content
-        @return: code_tree
+        @return: code_blocks_tree
         '''
         rang = range(0, len(dsdt_content))
-        keyword_list = {
+        keyword_list = (
             'Method', "Device", "Scope", "OperationRegion", "If", "Else",
             "Package", "Interrupt", "Resource", "IRQ",
             "Buffer", "Switch", "Case", "Default", "While",
             "Gpio", "StartDependentFn", "Processor", "DMA",
             "ThermalZone", "DefinitionBlock"
-        }
-        approve_list = {
-            "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
-        }
-        abandon_list = keyword_list - approve_list
+        )
+        approve_list = ("Method", "Device", "Scope", "OperationRegion", "DefinitionBlock")
         stack = []
         blocks = []
         for i in rang:
@@ -58,7 +55,7 @@ class getContent:
 
                             def appendPath(item, current_path):
                                 inside_bracket = item[2]
-                                if item[1] in abandon_list:
+                                if item[1] not in approve_list:
                                     return current_path
                                 if item[1] == 'Method':
                                     name = inside_bracket.split(',')[0]
@@ -119,7 +116,7 @@ class getContent:
                 block_info = stack.pop()
                 content = dsdt_content[block_info[0]:i+1]
                 block_type = block_info[1]
-                if block_type in abandon_list:
+                if block_type not in approve_list:
                     # Code blocks such as "if" "else" are abandoned
                     continue
                 inside_bracket = block_info[2]
@@ -147,42 +144,73 @@ class getContent:
         return blocks
 
     def index(self):
-        self.index_block = {}
+        self.index_blocks = {}
         for block in self.blocks:
             blk_type = block['type']
             try:
-                self.index_block[blk_type].append(block)
+                self.index_blocks[blk_type].append(block)
             except KeyError:
-                self.index_block[blk_type] = []
-                self.index_block[blk_type].append(block)
+                self.index_blocks[blk_type] = []
+                self.index_blocks[blk_type].append(block)
+        self.index_blocks[''] = self.blocks
+        del self.blocks
 
-    def getContent(self, path_or_name: str, blk_type=""):
+    def getContent(self, target: str, blk_type="") -> list:
         '''
-        Return content of given path or name, code block type is optional
-        @param: path_or_name
+        Return content of given target (path or name), code block type is optional.
+        This method will not judge the granularity since there won't be two method with the same name in one scope.
+
+        @param: target
         @param: blk_type (optional)
+        @return: result (list)
         '''
         result = []
-        if blk_type == "":
-            if path_or_name.startswith('\\'):
-                for item in self.blocks:
-                    if item['path'] == path_or_name:
-                        result.append(item)
-            else:
-                for item in self.blocks:
-                    if item['name'] == path_or_name:
-                        result.append(item)
+        if target.startswith('\\') or '.' in target:
+            for item in self.index_blocks[blk_type]:
+                if item['path'] == target:
+                    result.append(item)
         else:
-            if path_or_name.startswith('\\'):
-                for item in self.index_block[blk_type]:
-                    if item['path'] == path_or_name:
-                        result.append(item)
-            else:
-                for item in self.index_block[blk_type]:
-                    if item['name'] == path_or_name:
-                        result.append(item)
+            for item in self.index_blocks[blk_type]:
+                if item['name'] == target:
+                    result.append(item)
+        if len(result) == 0:
+            raise RuntimeError("Terget %s in given block type %s not found!" % (target, blk_type))
         return result
 
+    def search(self, target: str, blk_type='') -> list:
+        '''
+        Search target in all blocks, and return matched result in minimal granularity, 
+        which is determined by block type. If `blk_type` is empty, method will return the
+        minimal granularity in `approve_list` it could find.
+
+        @param: target
+        @param: blk_type
+        @return: result (list)
+        '''
+        result = []
+        for item in self.index_blocks[blk_type]:
+            if target in item['content']:
+                result.append(item)
+        min_granularity = []  # path
+        for item in result:
+            # if item[1] == blk_type:
+            if len(min_granularity) == 0:
+                min_granularity.append(item['path'])
+                continue
+            for gran in min_granularity:
+                if gran in item['path']:
+                    # if granularity of item is smaller
+                    min_granularity[min_granularity.index(gran)] = item['path']
+                    break
+                if gran in item['path'] or item['path'] in gran:
+                    break
+                min_granularity.append(item['path'])
+        for item in result.copy():
+            if item['path'] not in min_granularity:
+                result.remove(item)
+        if len(result) == 0:
+            raise RuntimeError("Terget %s in given block type %s not found!" % (target, blk_type))
+        return result
 
 def load_file():
     with open('Sample/DSDT_y700-isk.dsl', 'r') as f:
@@ -210,5 +238,5 @@ def load_file():
 
 
 if __name__ == '__main__':
-    gc = getContent(load_file())
-    gc.getContent("GPRW", "Method")
+    gc = GetContent(load_file())
+    gc.search("PNP0C0A", "Device")
