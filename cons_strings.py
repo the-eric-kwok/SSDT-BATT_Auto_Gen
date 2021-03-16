@@ -205,6 +205,55 @@ Method (_STA, 0, NotSerialized)
 }
 '''
 
+ADJT = '''
+Method (ADJT, 0, Serialized)
+{
+    If (_OSI ("Darwin"))
+    {
+        If (_STA ())
+        {
+            If ((^^LPCB.EC0.ECOK == One))
+            {
+                Local0 = ^^LPCB.EC0.SW2S
+            }
+            Else
+            {
+                Local0 = PWRS
+            }
+
+            If (((^^^LID0._LID () == Zero) && (Local0 == Zero)))
+            {
+                If ((CNST != One))
+                {
+                    CNST = One
+                    Sleep (0x0BB8)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x36, 0x14)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x37, 0x10)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x34, 0x2A)
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x24, Zero)
+                    ^^LPCB.EC0.PLGS = Zero
+                    ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x20)
+                }
+            }
+            ElseIf ((CNST != Zero))
+            {
+                CNST = Zero
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x36, One)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x37, 0x50)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x34, 0x7F)
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x24, 0x02)
+                ^^LPCB.EC0.PLGS = One
+                ^^LPCB.EC0.SMWR (0xC6, 0x50, 0x22, 0x40)
+            }
+        }
+    }
+    Else
+    {
+        \_SB.PCI0.ACEL.XDJT ()
+    }
+}
+'''
+
 
 SSDT_BATC = ['''
 DefinitionBlock("", "SSDT", 2, "hack", "BATC", 0)

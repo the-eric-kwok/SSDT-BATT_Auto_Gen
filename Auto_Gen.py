@@ -600,16 +600,20 @@ class AutoGen:
             Disable HP laptops' ACEL device
             '''
             print("Patching ACEL...")
-            content = self.gc.search("(ACEL)")  # TODO content will be a list
-            for dev in content:
-                if dev not in self.method:
-                    self.method[dev] = {}
-                self.method[dev]["%s._STA" % dev] = {
-                    'content': ACEL_STA,
+            # TODO content will be a list (fixed)
+            content = self.gc.search(
+                "\^\^LPCB\.EC0\.SMWR\s\(0xC6,\s0x50,\s0x22,\s0x40)\s*\^\^LPCB\.EC0\.SMWR\s\(0xC6,\s0x50,\s0x36,\sOne\)",
+                'Method', regex=True)
+            for item in content:
+                path = '.'.join(item['path'].split('.')[:-1])
+                if path not in self.method:
+                    self.method[path] = {}
+                self.method[path]["%s.ADJT" % path] = {
+                    'content': ADJT,
                     'modified': True
                 }
 
-        if "Device (ACEL)" in self.dsdt_content:
+        if "Device (ACEL)" in self.dsdt_content and 'Method (ADJT' in self.dsdt_content:
             if "HPQOEM" not in self.dsdt_content:
                 print(IS_THIS_HP_LAPTOP)
                 inp = input()
