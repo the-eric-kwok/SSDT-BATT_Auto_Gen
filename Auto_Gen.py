@@ -139,7 +139,7 @@ class AutoGen:
         for OR in self.OR_info:
             OR["field_unit"] = []
             OR_path = OR["path"]+'.'+OR["name"]
-            blocks = self.gc.getContent(OR_path)  # TODO content will be a list
+            blocks = self.gc.getContent(OR_path)  # TODO content will be a list (fixed)
             content = ''
             for block in blocks:
                 content += block['content'] + '\n'
@@ -250,7 +250,7 @@ class AutoGen:
             # Getting method content
             for unit in OR["field_unit"]:
                 try:
-                    result = self.gc.search(unit["name"], 'Method')  # TODO result will be a list
+                    result = self.gc.search(unit["name"], 'Method')  # TODO result will be a list (fixed)
                 except RuntimeError:
                     continue
                 for block in result:
@@ -602,7 +602,7 @@ class AutoGen:
             print("Patching ACEL...")
             # TODO content will be a list (fixed)
             content = self.gc.search(
-                "\^\^LPCB\.EC0\.SMWR\s\(0xC6,\s0x50,\s0x22,\s0x40)\s*\^\^LPCB\.EC0\.SMWR\s\(0xC6,\s0x50,\s0x36,\sOne\)",
+                "\^\^LPCB\.EC0\.SMWR\s\(0xC6,\s0x50,\s0x22,\s0x40\)\s*\^\^LPCB\.EC0\.SMWR\s\(0xC6,\s0x50,\s0x36,\sOne\)",
                 'Method', regex=True)
             for item in content:
                 path = '.'.join(item['path'].split('.')[:-1])
