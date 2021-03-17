@@ -34,17 +34,18 @@ class AutoGen:
     RW_method = ""
     comment = ""
 
-    def __init__(self, dsdt_content: str, filepath: str) -> None:
+    def __init__(self, dsdt_content: str, filepath: str, DUAL_BATT: bool) -> None:
         self.dsdt_content = dsdt_content
         self.filepath = filepath
         self.clean_out()
         self.gc = get_content_rewrite.GetContent(self.dsdt_content)
-        # self.split_dsdt()
         self.EC_path = self.gc.search('PNP0C09')[0]['path']
         self.EC_content = self.gc.getContent(self.EC_path)  # TODO EC_content will be a list (fixed)
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
+        if DUAL_BATT:
+            self.patch_dual_battery()
         self.patch_PTSWAK()
         self.insert_osi()
         self.special_devices()
@@ -71,23 +72,6 @@ class AutoGen:
             r'Firmware Error.*\n', "", self.dsdt_content)
         # Remove empty lines
         self.dsdt_content = re.sub(r'^\n', "", self.dsdt_content)
-
-    def split_dsdt(self):
-        '''
-        Spliting dsdt content by space. Will not strip them if not in debug mode.
-        '''
-        if DEBUG:
-            dsdt_splitline = self.dsdt_content.splitlines()
-            for i in range(0, len(dsdt_splitline)):
-                dsdt_splitline[i].strip()
-            self.dsdt_content = '\n'.join(dsdt_splitline)
-        self.dsdt_splited = self.dsdt_content.split(' ')
-        __length__ = len(self.dsdt_splited)
-        for i in range(0, __length__):
-            # remove spaces
-            i = __length__ - i - 1
-            if self.dsdt_splited[i] == '':
-                self.dsdt_splited.pop(i)
 
     def find_OperationRegion(self):
         '''
@@ -479,6 +463,17 @@ class AutoGen:
                                     break
                             self.method[scope][method]['modified'] = True
 
+    def patch_dual_battery(self):
+        # TODO: 重写 search 方法，使用范围缩小查找法，使其支持查找中间有空格的关键词
+        try:
+            content = self.gc.search("Notify (BAT0")
+            content += self.gc.search("Notify (BAT1")
+            content += self.gc.search("Notify (BAT2")
+            content += self.gc.search("Notify (BAT3")
+        except RuntimeError:
+            pass
+        print()
+
     def patch_PTSWAK(self):
         '''
         Patch _PTS and _WAK if they are modified.
@@ -630,14 +625,6 @@ class AutoGen:
                     patch_ACEL(self)
             else:
                 patch_ACEL(self)
-
-    def dual_battery(self):
-        # TODO: 重写 search 方法，使用范围缩小查找法，使其支持查找中间有空格的关键词
-        content = self.gc.search("Notify (BAT0")
-        content += self.gc.search("Notify (BAT1")
-        content += self.gc.search("Notify (BAT2")
-        content += self.gc.search("Notify (BAT3")
-        pass
 
     def generate_comment(self):
         # Find mutex and set them to zero
@@ -927,15 +914,16 @@ if __name__ == '__main__':
     filepath, dsdt_content = parse_args()
 
     result = re.findall("PNP0C0A", dsdt_content)
-    if not FORCE:
-        if len(result) > 1:
-            print(TOO_MANY_BATT_ERR)
-            exit(1)
-        elif len(result) < 1:
-            print(TOO_FEW_BATT_ERR)
-            exit(1)
+    DUAL_BATT = False
+    if len(result) > 1:
+        # print(TOO_MANY_BATT_ERR)
+        # exit(1)
+        DUAL_BATT = True
+    elif len(result) < 1:
+        print(TOO_FEW_BATT_ERR)
+        exit(1)
 
     # Single battery device
-    app = AutoGen(filepath=filepath, dsdt_content=dsdt_content)
+    app = AutoGen(dsdt_content, filepath, DUAL_BATT)
     # if VERBOSE:
     print("程序执行用时", time.time() - start_time, "秒")

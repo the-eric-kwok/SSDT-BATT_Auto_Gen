@@ -8,8 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-v -debug -F",
-                "Sample/DSDT-ZHAOYANG K4-iwl.dsl"
+                "Sample/DSDT_ThinkPadW530_多电池.dsl"
             ]
         }
     ]
