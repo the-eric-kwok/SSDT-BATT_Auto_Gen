@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "Sample/DSDT_ThinkPadW530_多电池.dsl"
+                "Sample/DSDT_HP-Pavilion-15.dsl"
             ]
         }
     ]

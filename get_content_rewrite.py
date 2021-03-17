@@ -58,13 +58,13 @@ class GetContent:
 
         rang = range(0, len(dsdt_content))
         keyword_list = (
-            'Method', "Device", "Scope", "OperationRegion", "If", "Else",
-            "Package", "Interrupt", "Resource", "IRQ",
-            "Buffer", "Switch", "Case", "Default", "While",
-            "Gpio", "StartDependentFn", "Processor", "DMA",
-            "ThermalZone", "DefinitionBlock"
+            'Method', 'Device', 'Scope', 'OperationRegion', 'If', 'Else',
+            'Package', 'Interrupt', 'Resource', 'IRQ',
+            'Buffer', 'Switch', 'Case', 'Default', 'While',
+            'Gpio', 'StartDependentFn', 'Processor', 'DMA',
+            'ThermalZone', 'DefinitionBlock'
         )
-        approve_list = ("Method", "Device", "Scope", "OperationRegion", "DefinitionBlock")
+        approve_list = ('Method', 'Device', 'Scope', 'OperationRegion', 'DefinitionBlock')
         stack = []
         blocks = []
         for i in rang:
@@ -79,11 +79,9 @@ class GetContent:
                         if keyword in rewind:
                             if DEBUG:
                                 print('\033[1;36minto: ' + rewind + '\033[0m')
-                                if 'WFTE' in rewind:
-                                    print()
                             try:
                                 inside_bracket = re.match(
-                                    "%s\s?\((.*)\)" % keyword, rewind)[1]
+                                    '%s\s?\((.*)\)' % keyword, rewind)[1]
                             except TypeError:
                                 inside_bracket = ''
                             start_offset = j
@@ -102,50 +100,50 @@ class GetContent:
                                 (start_offset, block_type, inside_bracket, path))
                             break
                     else:
-                        # Only executed when "for" is not broke down
+                        # Only executed when 'for' is not broke down
                         j -= 1
                         if j < 0:
                             raise RuntimeError(
-                                "Offset less than zero. Please re-check keyword_list!")
+                                'Offset less than zero. Please re-check keyword_list!')
                         continue
                     break
 
             elif dsdt_content[i] == '}':
                 def getDefinitionBlockName(inside_bracket):
                     spl = inside_bracket.split(',')
-                    name = spl[1].replace('"', '').strip() + \
-                        '-' + spl[4].replace('"', '').strip()
+                    name = spl[1].replace(''', '').strip() + \
+                        '-' + spl[4].replace(''', '').strip()
                     return name
                 block_info = stack.pop()
                 if DEBUG:
                     print('\033[1;36mout of: ' + block_info[2] + '\033[0m')
-                    if block_info[2] == 'WFTE':
-                        print()
                 content = dsdt_content[block_info[0]:i+1]
                 block_type = block_info[1]
                 if block_type not in approve_list:
-                    # Code blocks such as "if" "else" are abandoned
+                    # Code blocks such as 'if' 'else' are abandoned
                     continue
                 inside_bracket = block_info[2]
                 get_name = {
-                    "DefinitionBlock": getDefinitionBlockName,
-                    "Method": lambda arg: arg.split(',')[0],
-                    "Scope": lambda arg: arg,
-                    "Device": lambda arg: arg,
-                    "OperationRegion": lambda arg: arg.split(',')[0],
+                    'DefinitionBlock': getDefinitionBlockName,
+                    'Method': lambda arg: arg.split(',')[0],
+                    'Scope': lambda arg: arg,
+                    'Device': lambda arg: arg,
+                    'OperationRegion': lambda arg: arg.split(',')[0],
                 }
                 name = get_name[block_type](inside_bracket).replace('^', '').replace('\\', '')
+                '''
                 if block_info[3] == '':
                     path = '\\'
                 elif block_info[3] == '\\':
                     path = '\\' + name
                 else:
                     path = block_info[3] + '.' + name
+                '''
                 block_info = {
                     'name': name,
                     'type': block_type,
                     'content': content,
-                    'path': path
+                    'scope': block_info[3]
                 }
                 blocks.append(block_info)
         return blocks
@@ -162,13 +160,13 @@ class GetContent:
         self.index_blocks[''] = self.blocks
         del self.blocks
 
-    def getContent(self, target: str, blk_type="") -> list:
+    def getContent(self, target: str, blk_type='') -> list:
         '''
         Return content of given target (path or name, determined by . or back-slash), code block type is optional.
         This method will not judge the granularity since there won't be two method with the same name in one scope.
 
         @param: target - Such as '_SB.PCI0' (as a path) or 'AECL' (as a name)
-        @param: blk_type - Could be "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
+        @param: blk_type - Could be 'Method', 'Device', 'Scope', 'OperationRegion', 'DefinitionBlock'
         @return: result (list)
         '''
         result = []
@@ -176,7 +174,7 @@ class GetContent:
             if not target.startswith('\\'):
                 target = '\\' + target
             for item in self.index_blocks[blk_type]:
-                if item['path'] == target:
+                if item['scope'] + '.' + item['name'] == target:
                     result.append(item)
         else:
             for item in self.index_blocks[blk_type]:
@@ -193,7 +191,7 @@ class GetContent:
         minimal granularity in `approve_list` it could find.
 
         @param: target - The keyword to be searched
-        @param: blk_type - Could be "Method", "Device", "Scope", "OperationRegion", "DefinitionBlock"
+        @param: blk_type - Could be 'Method', 'Device', 'Scope', 'OperationRegion', 'DefinitionBlock'
         @return: result (list)
         '''
 
@@ -218,18 +216,18 @@ class GetContent:
         min_granularity = []  # path
         for item in result:
             if len(min_granularity) == 0:
-                min_granularity.append(item['path'])
+                min_granularity.append(item['scope'])
                 continue
             for gran in min_granularity:
-                if gran in item['path']:
+                if gran in item['scope']:
                     # if granularity of item is smaller
-                    min_granularity[min_granularity.index(gran)] = item['path']
+                    min_granularity[min_granularity.index(gran)] = item['scope']
                     break
-                if gran in item['path'] or item['path'] in gran:
+                if gran in item['scope'] or item['scope'] in gran:
                     break
-                min_granularity.append(item['path'])
+                min_granularity.append(item['scope'])
         for item in result.copy():
-            if item['path'] not in min_granularity:
+            if item['scope'] not in min_granularity:
                 result.remove(item)
         if len(result) == 0:
             raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
@@ -245,21 +243,21 @@ def load_file():
         '''
         # Remove block comments
         content = re.sub(
-            r'/\*[\w\W\n]*?\*/', "", content)
+            r'/\*[\w\W\n]*?\*/', '', content)
         # Remove line comments
         content = re.sub(r'//.*', '', content)
-        # Remove "External" declaration
+        # Remove 'External' declaration
         content = re.sub(
-            r'External.*\n', "", content)
-        # Remove "Firmware Error" that generated within disassambling
+            r'External.*\n', '', content)
+        # Remove 'Firmware Error' that generated within disassambling
         content = re.sub(
-            r'Firmware Error.*\n', "", content)
+            r'Firmware Error.*\n', '', content)
         # Remove empty lines
-        content = re.sub(r'^\n', "", content)
+        content = re.sub(r'^\n', '', content)
         return content
     return clean_out(content)
 
 
 if __name__ == '__main__':
     gc = GetContent(load_file())
-    gc.getContent("_SB.PCI0.LPCB.EC0")
+    gc.getContent('_SB.PCI0.LPCB.EC0')
