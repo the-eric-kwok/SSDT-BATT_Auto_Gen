@@ -4,7 +4,7 @@ import re
 VERBOSE = False
 DEBUG = False
 
-'''
+
 def set_verbose(flag):
     global VERBOSE
     VERBOSE = flag
@@ -12,7 +12,6 @@ def set_debug(flag):
     global VERBOSE, DEBUG
     DEBUG = flag
     VERBOSE = flag
-'''
 
 
 class GetContent:
@@ -25,6 +24,38 @@ class GetContent:
         @param: dsdt_content
         @return: code_blocks_tree
         '''
+        def appendPath(item, current_path):
+            inside_bracket = item[2]
+            if item[1] not in approve_list:
+                return current_path
+            if item[1] == 'Method':
+                name = inside_bracket.split(',')[0]
+            else:
+                name = inside_bracket
+            if name.startswith('\\'):
+                return name
+            if current_path == '\\':
+                return current_path + name
+            return current_path + '.' + name
+
+        def parseParentPrefix(inside_bracket, block_type, current_path):
+            '''
+            Deal with contents like `Method (^BN00)`
+            '''
+            if block_type == 'Method':
+                name = inside_bracket.split(',')[0]
+            else:
+                name = inside_bracket
+            _stack_ = current_path.split('.')
+            for i in range(0, name.count('^')):
+                _stack_.pop()
+            path = '.'.join(_stack_)
+            if path == '':
+                path = '\\'
+            # Not sure whether should I remove the ^ in inside_bracket
+            #inside_bracket = inside_bracket.replace('^', '')
+            return path
+
         rang = range(0, len(dsdt_content))
         keyword_list = (
             'Method', "Device", "Scope", "OperationRegion", "If", "Else",
@@ -42,8 +73,14 @@ class GetContent:
                 rewind = ''
                 while True:
                     rewind = dsdt_content[j] + rewind
+                    if DEBUG:
+                        print('rewind: ' + rewind)
                     for keyword in keyword_list:
                         if keyword in rewind:
+                            if DEBUG:
+                                print('\033[1;36minto: ' + rewind + '\033[0m')
+                                if 'WFTE' in rewind:
+                                    print()
                             try:
                                 inside_bracket = re.match(
                                     "%s\s?\((.*)\)" % keyword, rewind)[1]
@@ -51,21 +88,6 @@ class GetContent:
                                 inside_bracket = ''
                             start_offset = j
                             block_type = keyword
-
-                            def appendPath(item, current_path):
-                                inside_bracket = item[2]
-                                if item[1] not in approve_list:
-                                    return current_path
-                                if item[1] == 'Method':
-                                    name = inside_bracket.split(',')[0]
-                                else:
-                                    name = inside_bracket
-                                if name.startswith('\\'):
-                                    return name
-                                if current_path == '\\':
-                                    return current_path + name
-                                return current_path + '.' + name
-
                             # get path of code block
                             path = ''
                             for item in stack:
@@ -74,23 +96,6 @@ class GetContent:
                                 else:
                                     path = appendPath(item, path)
                             if inside_bracket.startswith('^'):
-                                def parseParentPrefix(inside_bracket, block_type, current_path):
-                                    '''
-                                    Deal with contents like `Method (^BN00)`
-                                    '''
-                                    if block_type == 'Method':
-                                        name = inside_bracket.split(',')[0]
-                                    else:
-                                        name = inside_bracket
-                                    _stack_ = current_path.split('.')
-                                    for i in range(0, name.count('^')):
-                                        _stack_.pop()
-                                    path = '.'.join(_stack_)
-                                    if path == '':
-                                        path = '\\'
-                                    # Not sure whether should I remove the ^ in inside_bracket
-                                    #inside_bracket = inside_bracket.replace('^', '')
-                                    return path
                                 if block_type in approve_list:
                                     path = parseParentPrefix(inside_bracket, block_type, path)
                             stack.append(
@@ -111,8 +116,11 @@ class GetContent:
                     name = spl[1].replace('"', '').strip() + \
                         '-' + spl[4].replace('"', '').strip()
                     return name
-
                 block_info = stack.pop()
+                if DEBUG:
+                    print('\033[1;36mout of: ' + block_info[2] + '\033[0m')
+                    if block_info[2] == 'WFTE':
+                        print()
                 content = dsdt_content[block_info[0]:i+1]
                 block_type = block_info[1]
                 if block_type not in approve_list:

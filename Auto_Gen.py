@@ -36,12 +36,12 @@ class AutoGen:
 
     def __init__(self, dsdt_content: str, filepath: str) -> None:
         self.dsdt_content = dsdt_content
-        self.gc = get_content_rewrite.GetContent(dsdt_content)
         self.filepath = filepath
         self.clean_out()
+        self.gc = get_content_rewrite.GetContent(self.dsdt_content)
         # self.split_dsdt()
         self.EC_path = self.gc.search('PNP0C09')[0]['path']
-        self.EC_content = self.gc.getContent(self.EC_path)  # TODO EC_content will be a list
+        self.EC_content = self.gc.getContent(self.EC_path)  # TODO EC_content will be a list (fixed)
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
@@ -880,13 +880,13 @@ def parse_args():
             show_help()
         if '-v' in arg:
             VERBOSE = True
-            # get_content_rewrite.set_verbose(True)
+            get_content_rewrite.set_verbose(True)
         if '-F' in arg or '--force' in arg:
             FORCE = True
         if '-debug' in arg:
             VERBOSE = True
             DEBUG = True
-            # get_content_rewrite.set_debug(True)
+            get_content_rewrite.set_debug(True)
         if '.dsl' in arg:
             filename = arg
             filepath = os.path.abspath(filename)
@@ -937,5 +937,5 @@ if __name__ == '__main__':
 
     # Single battery device
     app = AutoGen(filepath=filepath, dsdt_content=dsdt_content)
-    if VERBOSE:
-        print("程序执行用时", time.time() - start_time, "秒")
+    # if VERBOSE:
+    print("程序执行用时", time.time() - start_time, "秒")
