@@ -36,7 +36,7 @@
 - [ ] 双电池补丁
 - [ ] External 声明添加
 
-- [ ] ACEL.ADJT 中
+- [x] ACEL.ADJT 中
     ```assembly
     ElseIf (LNotEqual (CNST, Zero))
     {
