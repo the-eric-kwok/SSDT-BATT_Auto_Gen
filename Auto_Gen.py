@@ -297,7 +297,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. UNIT = xxxx
                         reserve = re.findall(
-                            '([\t \(]*)%s = (.*)' % unit['name'], method_content)
+                            '^([\t \(]*)%s = (.*)' % unit['name'], method_content, re.MULTILINE)
                         for item in reserve:
                             target = '%s%s = %s' % (
                                 item[0], unit['name'], item[1])
@@ -365,7 +365,7 @@ class AutoGen:
 
                         # Patch field reading, e.g. xxxx = UNIT
                         reserve = re.findall(
-                            '(^.*[^\.a-zA-Z/])%s([^a-zA-Z0-9,\.\n])' % unit['name'], method_content, re.MULTILINE)
+                            '(^.*[^\.a-zA-Z/])%s([^a-zA-Z0-9,\.\n][^\(])' % unit['name'], method_content, re.MULTILINE)
                         for item in reserve:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
