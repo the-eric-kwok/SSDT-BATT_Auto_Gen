@@ -16,7 +16,7 @@ def set_debug(flag):
 
 class GetContent:
     def __init__(self, dsdt_content):
-        self.blocks = self.__to_code_blocks__(dsdt_content)
+        self.__blocks__ = self.__to_code_blocks__(dsdt_content)
         self.__index__()
 
     def __to_code_blocks__(self, dsdt_content):
@@ -149,18 +149,18 @@ class GetContent:
         return blocks
 
     def __index__(self):
-        self.index_blocks = {}
-        for block in self.blocks:
+        self.__index_blocks__ = {}
+        for block in self.__blocks__:
             blk_type = block['type']
             try:
-                self.index_blocks[blk_type].append(block)
+                self.__index_blocks__[blk_type].append(block)
             except KeyError:
-                self.index_blocks[blk_type] = []
-                self.index_blocks[blk_type].append(block)
-        self.index_blocks[''] = self.blocks
-        del self.blocks
+                self.__index_blocks__[blk_type] = []
+                self.__index_blocks__[blk_type].append(block)
+        self.__index_blocks__[''] = self.__blocks__
+        del self.__blocks__
 
-    def getContent(self, target: str, blk_type='') -> list:
+    def get_content(self, target: str, blk_type='') -> list:
         '''
         Return content of given target (path or name, determined by . or back-slash), code block type is optional.
         This method will not judge the granularity since there won't be two method with the same name in one scope.
@@ -173,13 +173,13 @@ class GetContent:
         if target.startswith('\\') or '.' in target:
             if not target.startswith('\\'):
                 target = '\\' + target
-            for item in self.index_blocks[blk_type]:
+            for item in self.__index_blocks__[blk_type]:
                 if item['scope'] + '.' + item['name'] == target:
                     result.append(item)
                 if item['scope'] + item['name'] == target:
                     result.append(item)
         else:
-            for item in self.index_blocks[blk_type]:
+            for item in self.__index_blocks__[blk_type]:
                 if item['name'] == target:
                     result.append(item)
         if len(result) == 0:
@@ -198,7 +198,7 @@ class GetContent:
         '''
 
         result = []
-        for item in self.index_blocks[blk_type]:
+        for item in self.__index_blocks__[blk_type]:
             if regex:
                 if ignorecase:
                     re_sult = re.search(target, item['content'], re.IGNORECASE)
@@ -264,4 +264,4 @@ def load_file():
 
 if __name__ == '__main__':
     gc = GetContent(load_file())
-    gc.getContent('_SB.PCI0.LPCB.EC0')
+    gc.get_content('_SB.PCI0.LPCB.EC0')
