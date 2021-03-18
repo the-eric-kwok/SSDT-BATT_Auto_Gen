@@ -25,7 +25,8 @@
 - [x] 重命名补丁生成
 - [x] 生成产品在桌面
 - [x] Field 名字只有三个字母的时候报“无需patch”
-- [ ] 处理 OperationRegion 中偏移量为变量名的情况，如 DSDT_ASUS_FX503VD.dsl
+- [ ] 处理 OperationRegion 中偏移量为变量名的情况，如 DSDT_ASUS_FX503VD.dsl (fixed?)
+- [ ] 处理 to_code_blocks 方法中的 bug
 - [x] 修复 patch_method 中对一个 unit 进行了多次替换的问题
 - [x] 修复导致 Sample/DSDT-ZHAOYANG K4-iwl.dsl 无法正确 patch 的 bug（猜测是在 patch_method() 内）(检查/SM2S方法的路径)
 - [x] 处理 DSDT 使用 ECRD、ECWT 来读写变量的情况(绕开ECRD使用RECB来读取)
