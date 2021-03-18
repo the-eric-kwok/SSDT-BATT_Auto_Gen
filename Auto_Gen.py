@@ -303,8 +303,8 @@ class AutoGen:
                                 item[0], unit['name'], item[1])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s, %s)' % (
-                                        item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s, %s)' % (
+                                        item[0], OR['WECB'], unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s' % unit['name']
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -320,8 +320,8 @@ class AutoGen:
                                 item, unit['name'])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s (0x%X, %s, %s)' % (
-                                        OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item)
+                                    replace = '%s (%s + %s, %s, %s)' % (
+                                        OR['WECB'], unit['offset'], OR['offset'], unit['size'], item)
                                     replace = line.replace(
                                         target, replace) + ' //%s' % unit['name']
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -337,8 +337,8 @@ class AutoGen:
                                 item[0], item[1], unit['name'], item[2])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s, %s)' % (
-                                        item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s, %s)' % (
+                                        item[0], OR['WECB'], unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s' % unit['name']
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -354,8 +354,8 @@ class AutoGen:
                                 item[0], unit['name'], item[1])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s)%s' % (
-                                        item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s)%s' % (
+                                        item[0], OR['RECB'], unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s' % unit['name']
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -372,8 +372,8 @@ class AutoGen:
                             target = item[0] + unit['name'] + item[1]
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s)%s' % (
-                                        item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s)%s' % (
+                                        item[0], OR['RECB'], unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s' % unit['name']
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -389,8 +389,8 @@ class AutoGen:
                                 item[0], unit['name'], item[1])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s, %s)' % (
-                                        item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s, %s)' % (
+                                        item[0], OR['WECB'], unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s.%s' % (unit_path, unit['name'])
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -408,8 +408,8 @@ class AutoGen:
                                 item[0], item[1], unit['name'])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s, %s)' % (
-                                        item[1], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[0])
+                                    replace = '%s%s (%s + %s, %s, %s)' % (
+                                        item[1], OR['WECB'], unit['offset'], OR['offset'], unit['size'], item[0])
                                     replace = line.replace(
                                         target, replace) + ' //%s.%s' % (unit_path, unit['name'])
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -427,8 +427,8 @@ class AutoGen:
                                 item[0], item[1], item[2], unit['name'], item[3])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s, %s)' % (
-                                        item[0], OR['WECB'], unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s, %s)' % (
+                                        item[0], OR['WECB'], unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s.%s' % (unit_path, unit['name'])
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -446,8 +446,8 @@ class AutoGen:
                                 item[0], item[1], unit['name'], item[2])
                             for line in it_lines:
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s)%s' % (
-                                        item[0], OR['RECB'], unit['offset'] + OR['offset'], unit['size'], item[2])
+                                    replace = '%s%s (%s + %s, %s)%s' % (
+                                        item[0], OR['RECB'], unit['offset'], OR['offset'], unit['size'], item[2])
                                     replace = line.replace(
                                         target, replace) + ' //%s.%s' % (unit_path, unit['name'])
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
@@ -466,8 +466,8 @@ class AutoGen:
                                 if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                     continue  # stop patching method that have the same name as fieldunit
                                 if target in line:
-                                    replace = '%s%s (0x%X, %s)%s' % (item[0], OR['RECB'],
-                                                                     unit['offset'] + OR['offset'], unit['size'], item[1])
+                                    replace = '%s%s (%s + %s, %s)%s' % (item[0], OR['RECB'],
+                                                                     unit['offset'], OR['offset'], unit['size'], item[1])
                                     replace = line.replace(
                                         target, replace) + ' //%s.%s' % (unit_path, unit['name'])
                                     method_content = self.__method__[scope][method]['content'] = method_content.replace(
