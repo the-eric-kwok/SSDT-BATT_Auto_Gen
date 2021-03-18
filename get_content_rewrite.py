@@ -124,7 +124,7 @@ class GetContent:
                     continue
                 inside_bracket = block_info[2]
                 get_name = {
-                    'DefinitionBlock': getDefinitionBlockName,
+                    'DefinitionBlock': lambda arg: '\\',
                     'Method': lambda arg: arg.split(',')[0],
                     'Scope': lambda arg: arg,
                     'Device': lambda arg: arg,
@@ -176,6 +176,8 @@ class GetContent:
             for item in self.index_blocks[blk_type]:
                 if item['scope'] + '.' + item['name'] == target:
                     result.append(item)
+                if item['scope'] + item['name'] == target:
+                    result.append(item)
         else:
             for item in self.index_blocks[blk_type]:
                 if item['name'] == target:
@@ -216,18 +218,20 @@ class GetContent:
         min_granularity = []  # path
         for item in result:
             if len(min_granularity) == 0:
-                min_granularity.append(item['scope'])
+                min_granularity.append(item['scope'] + '.' + item['name'])
                 continue
             for gran in min_granularity:
                 if gran in item['scope']:
                     # if granularity of item is smaller
-                    min_granularity[min_granularity.index(gran)] = item['scope']
+                    min_granularity[min_granularity.index(gran)] = item['scope'] + '.' + item['name']
                     break
-                if gran in item['scope'] or item['scope'] in gran:
+                if gran in item['scope'] + '.' + item['name'] or item['scope'] + '.' + item['name'] in gran:
                     break
-                min_granularity.append(item['scope'])
+                if gran in item['scope'] + item['name'] or item['scope'] + item['name'] in gran:
+                    break
+                min_granularity.append(item['scope'] + '.' + item['name'])
         for item in result.copy():
-            if item['scope'] not in min_granularity:
+            if item['scope'] + '.' + item['name'] not in min_granularity:
                 result.remove(item)
         if len(result) == 0:
             raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))

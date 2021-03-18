@@ -34,26 +34,34 @@ class AutoGen:
     RW_method = ''
     comment = ''
 
-    def __init__(self, dsdt_content: str, filepath: str, DUAL_BATT: bool) -> None:
+    def __init__(self, dsdt_content: str, filepath: str) -> None:
         self.dsdt_content = dsdt_content
         self.filepath = filepath
         self.clean_out()
         self.gc = get_content_rewrite.GetContent(self.dsdt_content)
         EC = self.gc.search('PNP0C09')
-        self.EC_content = []
+        self.PNP0C09 = []
         for item in EC:
             EC_path = item['scope'] + '.' + item['name']  # TODO Multiple EC support (Should just work)
-            self.EC_content += self.gc.getContent(EC_path)
+            self.PNP0C09 += self.gc.getContent(EC_path)
         self.find_OperationRegion()
         self.find_field()
         self.patch_method()
-        if DUAL_BATT:
+        self.PNP0C0A = self.gc.search('PNP0C0A', 'Device')
+        for item in self.PNP0C0A.copy():
+            a = re.findall('Method\s\(_STA,\s0,\sNotSerialized\)\s*\{\s*Return\s\(Zero\)\s*\}', item['content'])
+            if len(a) > 0:
+                self.PNP0C0A.remove(item)
+        if len(self.PNP0C0A) > 1:
+            DUAL_BATT = True
             self.patch_dual_battery()
+        else:
+            DUAL_BATT = False
         self.patch_PTSWAK()
         self.insert_osi()
         self.special_devices()
         self.generate_comment()
-        self.assemble()
+        self.assemble(DUAL_BATT)
         self.re_indent()
         self.write_file()
 
@@ -82,12 +90,11 @@ class AutoGen:
         if VERBOSE:
             print(
                 'Into: find_OperationRegion(): Finding OperationRegion(s) inside EC scope.')
-        EC_content = self.EC_content
-        for block in EC_content:
+        for EC in self.PNP0C09.copy():
             OR_list = re.findall(
-                'OperationRegion \\(([A-Z0-9]{2,4}),', block['content'])
+                'OperationRegion\s\((.*?),\s.*?,\s(.*?),\s.*?\)', EC['content'])
             for OR_name in OR_list.copy():
-                content = self.gc.getContent(OR_name, 'OperationRegion')
+                content = self.gc.getContent(OR_name[0], 'OperationRegion')
                 for item in content.copy():
                     if 'EC' in item['scope']:  # Remove contents that is not in EC
                         break
@@ -97,25 +104,25 @@ class AutoGen:
                     break
                 for item in content:
                     OR_info = re.search(  # Getting info of OperationRegions by re.group
-                        'OperationRegion\s\(%s,\s([a-zA-Z].*),\s([a-zA-Z0-9].*),\s([a-zA-Z0-9].*)\)' % OR_name, item['content'])
+                        'OperationRegion\s\(%s,\s([a-zA-Z].*),\s%s,\s([a-zA-Z0-9].*)\)' % OR_name, item['content'])
                     try:
-                        if OR_info.group(2) == 'Zero':
+                        if OR_name[1] == 'Zero':
                             offset = 0
-                        elif OR_info.group(2) == 'One':
+                        elif OR_name[1] == 'One':
                             offset = 1
-                        elif 'Arg' in OR_info.group(2):
+                        elif 'Arg' in OR_name[1]:
                             continue  # TODO 处理类似 OperationRegion (NAME, Memory, Arg0, 0x01) 的情况
-                        elif '0x' in OR_info.group(2):
-                            offset = int(OR_info.group(2), 16)
+                        elif '0x' in OR_name[1]:
+                            offset = int(OR_name[1], 16)
                         else:
                             # TODO 处理类似 OperationRegion (ECAD, SystemMemory, GNBF, 0x10) 的情况，GNBF是另一个Unit (FX503VD)
-                            offset = OR_info.group(2)
+                            offset = OR_name[1]
                         self.OR_info.append({
-                            'scope': block['scope'] + '.' + block['name'],
-                            'name': OR_name,
+                            'scope': item['scope'],
+                            'name': OR_name[0],
                             'storage': OR_info.group(1),
                             'offset': offset,
-                            'length': OR_info.group(3)
+                            'length': OR_info.group(2)
                         })
                     except AttributeError:
                         continue
@@ -355,7 +362,7 @@ class AutoGen:
 
                         # Patch field reading, e.g. xxxx = UNIT
                         reserve = re.findall(
-                            '(.*[^\.a-zA-Z/])%s([^a-zA-Z0-9\.].*)' % unit['name'], method_content)
+                            '(^.*[^\.a-zA-Z/])%s([^a-zA-Z0-9,\.\n])' % unit['name'], method_content, re.MULTILINE)
                         for item in reserve:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
@@ -469,15 +476,29 @@ class AutoGen:
         # TODO: Multiple battery
         content = []
         try:
-            content += self.gc.search('Notify (BAT0')
-            content += self.gc.search('Notify (BAT1')
-            content += self.gc.search('Notify (BAT2')
-            content += self.gc.search('Notify (BAT3')
+            content += self.gc.search('Notify\s\(BAT[0123]', regex=True)
+            for EC in self.PNP0C09:
+                a = 'Notify\s\(%s\.%s\.BAT[0123]' % (EC['scope'].replace('\\', '\\\\').replace('.', '\.'), EC['name'])
+                content += self.gc.search(a, regex=True)
+                a = a.replace('\\\\', '')
+                content += self.gc.search(a, regex=True)
         except RuntimeError:
             pass
         for item in content:
             item['content'] = re.sub('Notify\s\(BAT[0123]', 'Notify (BATC', item['content'])
-            scope = item['scope']
+            for EC in self.PNP0C09:
+                a = 'Notify\s\(%s\.%s\.BAT[0123]' % (EC['scope'].replace('\\', '\\\\').replace('.', '\.'), EC['name'])
+                b = 'Notify (%s.%s.BATC' % (EC['scope'], EC['name'])
+                item['content'] = re.sub(a, b, item['content'])
+                a = a.replace('\\\\', '')
+                item['content'] = re.sub(a, b, item['content'])
+            item['content'] = re.sub('Notify\s\(\^BAT[0123]', 'Notify (^BATC', item['content'])
+            item['content'] = re.sub('Notify\s\(\^\^BAT[0123]', 'Notify (^^BATC', item['content'])
+
+            if item['scope'] not in self.method:
+                self.method[item['scope']] = {item['name']: {'content': item['content'], 'modified': True}}
+            else:
+                self.method[item['scope']][item['name']] = {'content': item['content'], 'modified': True}
 
     def patch_PTSWAK(self):
         '''
@@ -687,6 +708,13 @@ class AutoGen:
         self.comment += '* Note: Should be compile with -f option.\n'
         self.comment += '* For any support, plese visit https://github.com/the-eric-kwok/SSDT-BATT_Auto_Gen/issues\n'
         self.comment += '*\n'
+        self.comment += '* Patched unit: \n'
+        for OR in self.OR_info:
+            self.comment += '* '
+            for unit in OR['field_unit']:
+                self.comment += '%s ' % unit['name']
+            self.comment += '\n'
+        self.comment += '*\n'
         for patch in self.patch_list:
             self.comment += '* %s\n' % patch['comment']
             self.comment += '* Find:    %s\n' % patch['find']
@@ -694,27 +722,28 @@ class AutoGen:
             self.comment += '*\n'
         self.comment += '*/\n'
 
-    def assemble(self):
+    def assemble(self, DUAL_BATT):
         '''
         Grab comments, head, body, tail, and assemble them together.
         '''
         self.file_generated = self.comment
         self.file_generated += (self.head + self.RW_method)
         for scope in self.method:
-            have_method = False
             for method in self.method[scope]:
-                if self.method[scope][method]:
-                    have_method = True
-            if not have_method:
-                # Skip empty scope
-                continue
-            self.file_generated += '    Scope (%s)\n    {\n' % scope
-            for method in self.method[scope]:
-                if not self.method[scope][method]['modified']:
-                    # Skip unmodified method
-                    continue
-                self.file_generated += self.method[scope][method]['content'] + '\n'
-            self.file_generated += '    }\n'
+                if not self.method[scope][method]:
+                    break
+            else:
+                self.file_generated += '    Scope (%s)\n    {\n' % scope
+                for method in self.method[scope]:
+                    if not self.method[scope][method]['modified']:
+                        # Skip unmodified method
+                        continue
+                    self.file_generated += self.method[scope][method]['content'] + '\n'
+                self.file_generated += '    }\n'
+            # Skip empty scope
+            continue
+        if DUAL_BATT:
+            self.file_generated += SSDT_BATC[0] + self.PNP0C0A[0]['scope'] + SSDT_BATC[1]
         self.file_generated += '}\n'
 
     def re_indent(self):
@@ -911,16 +940,11 @@ if __name__ == '__main__':
     filepath, dsdt_content = parse_args()
 
     result = re.findall('PNP0C0A', dsdt_content)
-    DUAL_BATT = False
-    if len(result) > 1:
-        # print(TOO_MANY_BATT_ERR)
-        # exit(1)
-        DUAL_BATT = True
-    elif len(result) < 1:
+    if len(result) < 1:
         print(TOO_FEW_BATT_ERR)
         exit(1)
 
     # Single battery device
-    app = AutoGen(dsdt_content, filepath, DUAL_BATT)
+    app = AutoGen(dsdt_content, filepath)
     # if VERBOSE:
     print('程序执行用时', time.time() - start_time, '秒')
