@@ -71,10 +71,21 @@ class GetContent:
             if dsdt_content[i] == '{':
                 j = i - 1
                 rewind = ''
+                is_in_string = False
                 while True:
                     rewind = dsdt_content[j] + rewind
                     if DEBUG:
                         print('rewind: ' + rewind)
+                    if dsdt_content[j] == '"':
+                        # Skip keywords that is in string
+                        is_in_string = not is_in_string
+                        rewind = ''
+                    if is_in_string:
+                        j -= 1
+                        if j < 0:
+                            raise RuntimeError(
+                                'Offset less than zero. Please re-check keyword_list!')
+                        continue
                     for keyword in keyword_list:
                         if keyword in rewind:
                             if DEBUG:
