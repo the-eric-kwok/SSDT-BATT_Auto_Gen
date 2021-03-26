@@ -1,6 +1,8 @@
 # 使用范围缩小定位法重写搜索功能
 import re
 
+import CodeBlock as cb
+
 VERBOSE = False
 DEBUG = False
 
@@ -8,6 +10,8 @@ DEBUG = False
 def set_verbose(flag):
     global VERBOSE
     VERBOSE = flag
+
+
 def set_debug(flag):
     global VERBOSE, DEBUG
     DEBUG = flag
@@ -19,24 +23,26 @@ class GetContent:
         self.__blocks__ = self.__to_code_blocks__(dsdt_content)
         self.__index__()
 
-    def __to_code_blocks__(self, dsdt_content):
+    @staticmethod
+    def __to_code_blocks__(dsdt_content):
         '''
         @param: dsdt_content
         @return: code_blocks_tree
         '''
+
         def appendPath(item, current_path):
-            inside_bracket = item[2]
-            if item[1] not in approve_list:
+            inside_bracket = item.inside_bracket
+            if item.type not in approve_list:
                 return current_path
-            if item[1] == 'Method':
-                name = inside_bracket.split(',')[0]
+            if item.type == 'Method':
+                _ = inside_bracket.split(',')[0]
             else:
-                name = inside_bracket
-            if name.startswith('\\'):
-                return name
+                _ = inside_bracket
+            if _.startswith('\\'):
+                return _
             if current_path == '\\':
-                return current_path + name
-            return current_path + '.' + name
+                return current_path + _
+            return current_path + '.' + _
 
         def parseParentPrefix(inside_bracket, block_type, current_path):
             '''
@@ -95,23 +101,26 @@ class GetContent:
                                     '%s\s?\((.*)\)' % keyword, rewind)[1]
                             except TypeError:
                                 inside_bracket = ''
-                            start_offset = j
                             block_type = keyword
                             # get path of code block
-                            path = ''
+                            scope = ''
                             for item in stack:
-                                if item[1] == 'DefinitionBlock':
-                                    path = '\\'
+                                if item.type == 'DefinitionBlock':
+                                    scope = '\\'
                                 else:
-                                    path = appendPath(item, path)
+                                    scope = appendPath(item, scope)
                             if inside_bracket.startswith('^'):
                                 if block_type in approve_list:
-                                    path = parseParentPrefix(inside_bracket, block_type, path)
+                                    scope = parseParentPrefix(inside_bracket, block_type, scope)
                             stack.append(
-                                (start_offset, block_type, inside_bracket, path))
+                                cb.CodeBlock(
+                                    start_index=j,
+                                    type=block_type,
+                                    inside_bracket=inside_bracket,
+                                    scope=scope))
                             break
                     else:
-                        # Only executed when 'for' is not broke down
+                        # Only executed when the 'for' statement is not broken
                         j -= 1
                         if j < 0:
                             raise RuntimeError(
@@ -120,20 +129,15 @@ class GetContent:
                     break
 
             elif dsdt_content[i] == '}':
-                def getDefinitionBlockName(inside_bracket):
-                    spl = inside_bracket.split(',')
-                    name = spl[1].replace(''', '').strip() + \
-                        '-' + spl[4].replace(''', '').strip()
-                    return name
-                block_info = stack.pop()
+                block = stack.pop()
                 if DEBUG:
-                    print('\033[1;36mout of: ' + block_info[2] + '\033[0m')
-                content = dsdt_content[block_info[0]:i+1]
-                block_type = block_info[1]
-                if block_type not in approve_list:
+                    print('\033[1;36mout of: ' + block.inside_bracket + '\033[0m')
+                block.end_index = i + 1
+                block.content = dsdt_content[block.start_index: block.end_index]
+                if block.type not in approve_list:
                     # Code blocks such as 'if' 'else' are abandoned
                     continue
-                inside_bracket = block_info[2]
+                inside_bracket = block.inside_bracket
                 get_name = {
                     'DefinitionBlock': lambda arg: '\\',
                     'Method': lambda arg: arg.split(',')[0],
@@ -141,33 +145,20 @@ class GetContent:
                     'Device': lambda arg: arg,
                     'OperationRegion': lambda arg: arg.split(',')[0],
                 }
-                name = get_name[block_type](inside_bracket).replace('^', '').replace('\\', '')
-                '''
-                if block_info[3] == '':
-                    path = '\\'
-                elif block_info[3] == '\\':
-                    path = '\\' + name
-                else:
-                    path = block_info[3] + '.' + name
-                '''
-                block_info = {
-                    'name': name,
-                    'type': block_type,
-                    'content': content,
-                    'scope': block_info[3]
-                }
-                blocks.append(block_info)
+                block.name = get_name[block.type](inside_bracket).replace('^', '')
+                if not block.name.endswith("\\"):
+                    block.name = block.name.replace("\\", "")
+                blocks.append(block)
         return blocks
 
     def __index__(self):
         self.__index_blocks__ = {}
         for block in self.__blocks__:
-            blk_type = block['type']
             try:
-                self.__index_blocks__[blk_type].append(block)
+                self.__index_blocks__[block.type].append(block)
             except KeyError:
-                self.__index_blocks__[blk_type] = []
-                self.__index_blocks__[blk_type].append(block)
+                self.__index_blocks__[block.type] = []
+                self.__index_blocks__[block.type].append(block)
         self.__index_blocks__[''] = self.__blocks__
         del self.__blocks__
 
@@ -185,13 +176,13 @@ class GetContent:
             if not target.startswith('\\'):
                 target = '\\' + target
             for item in self.__index_blocks__[blk_type]:
-                if item['scope'] + '.' + item['name'] == target:
+                if item.scope + '.' + item.name == target:
                     result.append(item)
-                if item['scope'] + item['name'] == target:
+                if item.scope + item.name == target:
                     result.append(item)
         else:
             for item in self.__index_blocks__[blk_type]:
-                if item['name'] == target:
+                if item.name == target:
                     result.append(item)
         if len(result) == 0:
             raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
@@ -212,37 +203,37 @@ class GetContent:
         for item in self.__index_blocks__[blk_type]:
             if regex:
                 if ignorecase:
-                    re_sult = re.search(target, item['content'], re.IGNORECASE)
-                    if re_sult:
+                    re_result = re.search(target, item.content, re.IGNORECASE)
+                    if re_result:
                         result.append(item)
                 else:
-                    re_sult = re.search(target, item['content'])
-                    if re_sult:
+                    re_result = re.search(target, item.content)
+                    if re_result:
                         result.append(item)
             else:
                 if ignorecase:
-                    if target.lower() in item['content'].lower():
+                    if target.lower() in item.content.lower():
                         result.append(item)
                 else:
-                    if target in item['content']:
+                    if target in item.content:
                         result.append(item)
         min_granularity = []  # path
         for item in result:
             if len(min_granularity) == 0:
-                min_granularity.append(item['scope'] + '.' + item['name'])
+                min_granularity.append(item.scope + '.' + item.name)
                 continue
             for gran in min_granularity:
-                if gran in item['scope']:
+                if gran in item.scope:
                     # if granularity of item is smaller
-                    min_granularity[min_granularity.index(gran)] = item['scope'] + '.' + item['name']
+                    min_granularity[min_granularity.index(gran)] = item.scope + '.' + item.name
                     break
-                if gran in item['scope'] + '.' + item['name'] or item['scope'] + '.' + item['name'] in gran:
+                if gran in item.scope + '.' + item.name or item.scope + '.' + item.name in gran:
                     break
-                if gran in item['scope'] + item['name'] or item['scope'] + item['name'] in gran:
+                if gran in item.scope + item.name or item.scope + item.name in gran:
                     break
-                min_granularity.append(item['scope'] + '.' + item['name'])
+                min_granularity.append(item.scope + '.' + item.name)
         for item in result.copy():
-            if item['scope'] + '.' + item['name'] not in min_granularity:
+            if item.scope + '.' + item.name not in min_granularity:
                 result.remove(item)
         if len(result) == 0:
             raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
