@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "/Users/eric/Documents/SSDT-BATT_Auto_Gen/Sample/DSDT_ThinkPadW530_多电池.dsl"
+                "Sample/DSDT_ThinkPad_Helix_2nd_Hand_Held.dsl"
             ]
         }
     ]

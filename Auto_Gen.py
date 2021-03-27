@@ -207,19 +207,19 @@ class AutoGen:
 
                         # Add the content of R/W method to self.RW_method
                         self._RW_method += RW_METHOD[0] + \
-                                           OR.scope + RW_METHOD[1] + \
-                                           OR.RE1B + RW_METHOD[2] + \
-                                           OR.ERM2 + RW_METHOD[3] + \
-                                           OR.storage + RW_METHOD[4] + \
-                                           OR.ERM2 + RW_METHOD[5] + \
-                                           OR.RECB + RW_METHOD[6] + \
-                                           OR.RE1B + RW_METHOD[7] + \
-                                           OR.WE1B + RW_METHOD[8] + \
-                                           OR.ERM2 + RW_METHOD[9] + \
-                                           OR.storage + RW_METHOD[10] + \
-                                           OR.ERM2 + RW_METHOD[11] + \
-                                           OR.WECB + RW_METHOD[12] + \
-                                           OR.WE1B + RW_METHOD[13]
+                            OR.scope + RW_METHOD[1] + \
+                            OR.RE1B + RW_METHOD[2] + \
+                            OR.ERM2 + RW_METHOD[3] + \
+                            OR.storage + RW_METHOD[4] + \
+                            OR.ERM2 + RW_METHOD[5] + \
+                            OR.RECB + RW_METHOD[6] + \
+                            OR.RE1B + RW_METHOD[7] + \
+                            OR.WE1B + RW_METHOD[8] + \
+                            OR.ERM2 + RW_METHOD[9] + \
+                            OR.storage + RW_METHOD[10] + \
+                            OR.ERM2 + RW_METHOD[11] + \
+                            OR.WECB + RW_METHOD[12] + \
+                            OR.WE1B + RW_METHOD[13]
                     else:
                         # If OR.storage in self.RW_method and not in OR itself
                         # Then copy the read/write method from other OR which has the same storage
@@ -511,69 +511,85 @@ class AutoGen:
         '''
         Patch _PTS and _WAK if they are modified.
         '''
-        PTS_Serialized = 'NotSerialized'
-        WAK_Serialized = 'NotSerialized'
-        TTS_Serialized = 'NotSerialized'
+        is_PTS_Serialized = 'NotSerialized'
+        is_WAK_Serialized = 'NotSerialized'
+        is_TTS_Serialized = 'NotSerialized'
         for scope in self._method.copy():
             for method in self._method[scope].copy():
                 if not self._method[scope][method]['modified']:
                     # skip unmodified method
                     continue
                 if '_PTS' in method:
+                    self._method[scope]['_PTS'] = {'content': self._method[scope][method]['content'].replace(
+                        '_PTS', 'YPTS'), 'modified': True}
+
+                if '\\_PTS' in method:
                     self._method[scope]['\\_PTS'] = {'content': self._method[scope][method]['content'].replace(
                         '_PTS', 'YPTS'), 'modified': True}
 
                 if '_WAK' in method:
+                    self._method[scope]['_WAK'] = {'content': self._method[scope][method]['content'].replace(
+                        '_WAK', 'YWAK'), 'modified': True}
+
+                if '\\_WAK' in method:
                     self._method[scope]['\\_WAK'] = {'content': self._method[scope][method]['content'].replace(
                         '_WAK', 'YWAK'), 'modified': True}
 
                 if '_TTS' in method:
+                    self._method[scope]['_WAK'] = {'content': self._method[scope][method]['content'].replace(
+                        '_WAK', 'YWAK'), 'modified': True}
+
+                if '\\_TTS' in method:
                     self._method[scope]['\\_WAK'] = {'content': self._method[scope][method]['content'].replace(
                         '_WAK', 'YWAK'), 'modified': True}
 
                 if '_PTS' in method or '_WAK' in method or '_TTS' in method:
                     try:
-                        PTS_Serialized = re.search(
+                        is_PTS_Serialized = re.search(
                             '_PTS, 1, (NotSerialized|Serialized)', self._dsdt_content).groups()[0]
                     except AttributeError:
-                        pass
+                        is_PTS_Serialized = None
                     try:
-                        WAK_Serialized = re.search(
+                        is_WAK_Serialized = re.search(
                             '_WAK, 1, (NotSerialized|Serialized)', self._dsdt_content).groups()[0]
                     except AttributeError:
-                        pass
+                        is_WAK_Serialized = None
                     try:
-                        TTS_Serialized = re.search(
+                        is_TTS_Serialized = re.search(
                             '_TTS, 1, (NotSerialized|Serialized)', self._dsdt_content).groups()[0]
                     except AttributeError:
-                        pass
+                        is_TTS_Serialized = None
 
-                    self._method['\\_SB'] = {'\\_SB.PCI9': {
-                        'content': PCI9, 'modified': True}}
+                    if is_PTS_Serialized or is_WAK_Serialized or is_TTS_Serialized:
+                        self._method['\\_SB'] = {'\\_SB.PCI9': {
+                            'content': PCI9, 'modified': True}}
 
-                    _PTS = PTS[0] + PTS_Serialized + PTS[1]
-                    if '\\_PTS' in self._method['\\']:
-                        self._method['\\']['\\_PTS'].content += _PTS
-                        self._method['\\']['\\_PTS']['modified'] = True
-                    else:
-                        self._method['\\']['\\_PTS'] = {
-                            'content': _PTS, 'modified': True}
+                    if is_PTS_Serialized:
+                        _PTS = PTS[0] + is_PTS_Serialized + PTS[1]
+                        if '\\_PTS' in self._method['\\']:
+                            self._method['\\']['\\_PTS']['content'] += _PTS
+                            self._method['\\']['\\_PTS']['modified'] = True
+                        else:
+                            self._method['\\']['\\_PTS'] = {
+                                'content': _PTS, 'modified': True}
 
-                    _WAK = WAK[0] + WAK_Serialized + WAK[1]
-                    if '\\_WAK' in self._method['\\']:
-                        self._method['\\']['\\_WAK'].content += _WAK
-                        self._method['\\']['\\_WAK']['modified'] = True
-                    else:
-                        self._method['\\']['\\_WAK'] = {
-                            'content': _WAK, 'modified': True}
+                    if is_WAK_Serialized:
+                        _WAK = WAK[0] + is_WAK_Serialized + WAK[1]
+                        if '\\_WAK' in self._method['\\']:
+                            self._method['\\']['\\_WAK']['content'] += _WAK
+                            self._method['\\']['\\_WAK']['modified'] = True
+                        else:
+                            self._method['\\']['\\_WAK'] = {
+                                'content': _WAK, 'modified': True}
 
-                    _TTS = TTS[0] + TTS_Serialized + TTS[1]
-                    if '\\_TTS' in self._method['\\']:
-                        self._method['\\']['\\_TTS'].content += _TTS
-                        self._method['\\']['\\_TTS']['modified'] = True
-                    else:
-                        self._method['\\']['\\_TTS'] = {
-                            'content': _TTS, 'modified': True}
+                    if is_TTS_Serialized:
+                        _TTS = TTS[0] + is_TTS_Serialized + TTS[1]
+                        if '\\_TTS' in self._method['\\']:
+                            self._method['\\']['\\_TTS']['content'] += _TTS
+                            self._method['\\']['\\_TTS']['modified'] = True
+                        else:
+                            self._method['\\']['\\_TTS'] = {
+                                'content': _TTS, 'modified': True}
 
     def _insert_osi(self):
         '''
@@ -611,9 +627,9 @@ class AutoGen:
                                 arg += 'Arg%d' % i
                             # Insert return original method at the bottom
                             self._method[scope][method]['content'] = self._method[scope][method]['content'][:index] + \
-                                                                     '}\n        Else\n        {\n            Return(X%s(%s))\n        }\n' % (
-                                                                         method_info[0][-3:], arg) + \
-                                                                     self._method[scope][method]['content'][index:]
+                                '}\n        Else\n        {\n            Return(X%s(%s))\n        }\n' % (
+                                method_info[0][-3:], arg) + \
+                                self._method[scope][method]['content'][index:]
                             break
 
     def _special_devices(self):
