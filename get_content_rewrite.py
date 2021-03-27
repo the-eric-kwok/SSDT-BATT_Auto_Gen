@@ -1,6 +1,5 @@
 # 使用范围缩小定位法重写搜索功能
 import re
-
 import CodeBlock as cb
 
 VERBOSE = False
@@ -20,11 +19,11 @@ def set_debug(flag):
 
 class GetContent:
     def __init__(self, dsdt_content):
-        self.__blocks__ = self.__to_code_blocks__(dsdt_content)
-        self.__index__()
+        self._blocks = self._to_code_blocks(dsdt_content)
+        self._index()
 
     @staticmethod
-    def __to_code_blocks__(dsdt_content):
+    def _to_code_blocks(dsdt_content):
         '''
         @param: dsdt_content
         @return: code_blocks_tree
@@ -64,16 +63,17 @@ class GetContent:
 
         rang = range(0, len(dsdt_content))
         keyword_list = (
-            'Method', 'Device', 'Scope', 'OperationRegion', 'If', 'Else',
+            'Method', 'Device', 'Scope', 'Field', 'If', 'Else',
             'Package', 'Interrupt', 'Resource', 'IRQ',
             'Buffer', 'Switch', 'Case', 'Default', 'While',
             'Gpio', 'StartDependentFn', 'Processor', 'DMA',
             'ThermalZone', 'DefinitionBlock'
         )
-        approve_list = ('Method', 'Device', 'Scope', 'OperationRegion', 'DefinitionBlock')
+        approve_list = ('Method', 'Device', 'Scope', 'Field', 'DefinitionBlock')
         stack = []
         blocks = []
         for i in rang:
+            _ = dsdt_content[i]
             if dsdt_content[i] == '{':
                 j = i - 1
                 rewind = ''
@@ -82,6 +82,8 @@ class GetContent:
                     rewind = dsdt_content[j] + rewind
                     if DEBUG:
                         print('rewind: ' + rewind)
+                    if 'VPCG' in rewind:
+                        print()
                     if dsdt_content[j] == '"':
                         # Skip keywords that is in string
                         is_in_string = not is_in_string
@@ -102,11 +104,23 @@ class GetContent:
                             except TypeError:
                                 inside_bracket = ''
                             block_type = keyword
-                            # get path of code block
+                            if block_type == 'Field':
+                                k = j - 1
+                                while (True):
+                                    additional = dsdt_content[k:j]
+                                    if 'OperationRegion' in additional:
+                                        j = k
+                                        break
+                                    if j - k > 100:
+                                        break
+                                    k -= 1
+                                    # get path of code block
                             scope = ''
                             for item in stack:
                                 if item.type == 'DefinitionBlock':
                                     scope = '\\'
+                                elif item.type == 'Scope':
+                                    scope = item.inside_bracket
                                 else:
                                     scope = appendPath(item, scope)
                             if inside_bracket.startswith('^'):
@@ -129,6 +143,11 @@ class GetContent:
                     break
 
             elif dsdt_content[i] == '}':
+                def getScopeName(arg):
+                    # if '.' in arg:
+                    return arg.split('.')[-1]
+                    # return arg.split('\\')[-1]
+
                 block = stack.pop()
                 if DEBUG:
                     print('\033[1;36mout of: ' + block.inside_bracket + '\033[0m')
@@ -141,9 +160,9 @@ class GetContent:
                 get_name = {
                     'DefinitionBlock': lambda arg: '\\',
                     'Method': lambda arg: arg.split(',')[0],
-                    'Scope': lambda arg: arg,
+                    'Scope': getScopeName,
                     'Device': lambda arg: arg,
-                    'OperationRegion': lambda arg: arg.split(',')[0],
+                    'Field': lambda arg: arg.split(',')[0],
                 }
                 block.name = get_name[block.type](inside_bracket).replace('^', '')
                 if not block.name.endswith("\\"):
@@ -151,16 +170,16 @@ class GetContent:
                 blocks.append(block)
         return blocks
 
-    def __index__(self):
-        self.__index_blocks__ = {}
-        for block in self.__blocks__:
+    def _index(self):
+        self._indexed_blocks = {}
+        for block in self._blocks:
             try:
-                self.__index_blocks__[block.type].append(block)
+                self._indexed_blocks[block.type].append(block)
             except KeyError:
-                self.__index_blocks__[block.type] = []
-                self.__index_blocks__[block.type].append(block)
-        self.__index_blocks__[''] = self.__blocks__
-        del self.__blocks__
+                self._indexed_blocks[block.type] = []
+                self._indexed_blocks[block.type].append(block)
+        self._indexed_blocks[''] = self._blocks
+        del self._blocks
 
     def get_content(self, target: str, blk_type='') -> list:
         '''
@@ -168,20 +187,20 @@ class GetContent:
         This method will not judge the granularity since there won't be two method with the same name in one scope.
 
         @param: target - Such as '_SB.PCI0' (as a path) or 'AECL' (as a name)
-        @param: blk_type - Could be 'Method', 'Device', 'Scope', 'OperationRegion', 'DefinitionBlock'
+        @param: blk_type - Could be 'Method', 'Device', 'Scope', 'Field', 'DefinitionBlock'
         @return: result (list)
         '''
         result = []
         if target.startswith('\\') or '.' in target:
             if not target.startswith('\\'):
                 target = '\\' + target
-            for item in self.__index_blocks__[blk_type]:
+            for item in self._indexed_blocks[blk_type]:
                 if item.scope + '.' + item.name == target:
                     result.append(item)
                 if item.scope + item.name == target:
                     result.append(item)
         else:
-            for item in self.__index_blocks__[blk_type]:
+            for item in self._indexed_blocks[blk_type]:
                 if item.name == target:
                     result.append(item)
         if len(result) == 0:
@@ -195,12 +214,12 @@ class GetContent:
         minimal granularity in `approve_list` it could find.
 
         @param: target - The keyword to be searched
-        @param: blk_type - Could be 'Method', 'Device', 'Scope', 'OperationRegion', 'DefinitionBlock'
+        @param: blk_type - Could be 'Method', 'Device', 'Scope', 'Field', 'DefinitionBlock'
         @return: result (list)
         '''
 
         result = []
-        for item in self.__index_blocks__[blk_type]:
+        for item in self._indexed_blocks[blk_type]:
             if regex:
                 if ignorecase:
                     re_result = re.search(target, item.content, re.IGNORECASE)
@@ -240,7 +259,7 @@ class GetContent:
         return result
 
 def load_file():
-    with open('Sample/DSDT_ASUS_FX503VD.dsl', 'r') as f:
+    with open('Sample/DSDT_ThinkPad_Helix_2nd_Hand_Held.dsl', 'r') as f:
         content = f.read()
 
     def clean_out(content):
@@ -266,4 +285,4 @@ def load_file():
 
 if __name__ == '__main__':
     gc = GetContent(load_file())
-    gc.get_content('_SB.PCI0.LPCB.EC0')
+    gc.get_content('\\_SB.PCI0.LPC.EC.ECOR')

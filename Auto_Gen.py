@@ -100,7 +100,7 @@ class AutoGen:
             OR_list = re.findall(
                 r'OperationRegion\s\((.*?),\s.*?,\s(.*?),\s.*?\)', EC.content)
             for OR_name in OR_list.copy():
-                content = self.gc.get_content(OR_name[0], 'OperationRegion')
+                content = self.gc.get_content(OR_name[0], 'Field')
                 for item in content.copy():
                     if 'EC' in item.scope:  # Remove contents that is not in EC
                         break
