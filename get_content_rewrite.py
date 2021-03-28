@@ -82,8 +82,6 @@ class GetContent:
                     rewind = dsdt_content[j] + rewind
                     if DEBUG:
                         print('rewind: ' + rewind)
-                    if 'VPCG' in rewind:
-                        print()
                     if dsdt_content[j] == '"':
                         # Skip keywords that is in string
                         is_in_string = not is_in_string
@@ -111,6 +109,8 @@ class GetContent:
                                     if 'OperationRegion' in additional:
                                         j = k
                                         break
+                                    if 'Index' in additional:
+                                        block_type = 'IndexField'
                                     if j - k > 100:
                                         break
                                     k -= 1
@@ -120,12 +120,19 @@ class GetContent:
                                 if item.type == 'DefinitionBlock':
                                     scope = '\\'
                                 elif item.type == 'Scope':
-                                    scope = item.inside_bracket
+                                    scope = item.path
                                 else:
                                     scope = appendPath(item, scope)
                             if inside_bracket.startswith('^'):
                                 if block_type in approve_list:
                                     scope = parseParentPrefix(inside_bracket, block_type, scope)
+                            if block_type == "Scope":
+                                if inside_bracket.startswith('\\'):
+                                    scope = inside_bracket
+                                elif scope.endswith('\\'):
+                                    scope += inside_bracket
+                                else:
+                                    scope = scope + '.' + inside_bracket
                             stack.append(
                                 cb.CodeBlock(
                                     start_index=j,
@@ -143,11 +150,6 @@ class GetContent:
                     break
 
             elif dsdt_content[i] == '}':
-                def getScopeName(arg):
-                    # if '.' in arg:
-                    return arg.split('.')[-1]
-                    # return arg.split('\\')[-1]
-
                 block = stack.pop()
                 if DEBUG:
                     print('\033[1;36mout of: ' + block.inside_bracket + '\033[0m')
@@ -160,7 +162,7 @@ class GetContent:
                 get_name = {
                     'DefinitionBlock': lambda arg: '\\',
                     'Method': lambda arg: arg.split(',')[0],
-                    'Scope': getScopeName,
+                    'Scope': lambda arg: '',
                     'Device': lambda arg: arg,
                     'Field': lambda arg: arg.split(',')[0],
                 }
@@ -259,7 +261,7 @@ class GetContent:
         return result
 
 def load_file():
-    with open('Sample/DSDT_ThinkPad_Helix_2nd_Hand_Held.dsl', 'r') as f:
+    with open('Sample/DSDT-Acel_A715-73G.dsl', 'r') as f:
         content = f.read()
 
     def clean_out(content):

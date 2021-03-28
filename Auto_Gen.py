@@ -98,40 +98,33 @@ class AutoGen:
                 'Into: find_OperationRegion(): Finding OperationRegion(s) inside EC scope.')
         for EC in self._PNP0C09.copy():
             OR_list = re.findall(
-                r'OperationRegion\s\((.*?),\s.*?,\s(.*?),\s.*?\)', EC.content)
+                r'OperationRegion\s\((.*?)\)', EC.content)
+            if len(OR_list) == 0:
+                self._PNP0C09.remove(EC)
             for OR_name in OR_list.copy():
-                content = self.gc.get_content(OR_name[0], 'Field')
-                for item in content.copy():
-                    if 'EC' in item.scope:  # Remove contents that is not in EC
+                for OR in self.gc.search(OR_name, 'Field'):
+                    path = OR.path
+                    OR_full = self.gc.get_content(path, 'Field')
+                    for item in OR_full.copy():
+                        if 'EC' in item.scope:  # Remove contents that is not in EC
+                            break
+                        OR_full.remove(item)
+                    if len(OR_full) == 0:
+                        OR_list.remove(OR_name)
                         break
-                    content.remove(item)
-                if len(content) == 0:
-                    OR_list.remove(OR_name)
-                    break
-                for item in content:
-                    OR_info = re.search(  # Getting info of OperationRegions by re.group
-                        r'OperationRegion\s\(%s,\s([a-zA-Z].*),\s%s,\s([a-zA-Z0-9].*)\)' % OR_name, item.content)
-                    try:
-                        if OR_name[1] == 'Zero':
-                            offset = 0
-                        elif OR_name[1] == 'One':
-                            offset = 1
-                        elif 'Arg' in OR_name[1]:
-                            continue  # TODO 处理类似 OperationRegion (NAME, Memory, Arg0, 0x01) 的情况
-                        elif '0x' in OR_name[1]:
-                            offset = int(OR_name[1], 16)
-                        else:
-                            # TODO 处理类似 OperationRegion (ECAD, SystemMemory, GNBF, 0x10) 的情况，GNBF是另一个Unit (FX503VD)
-                            offset = OR_name[1]
-                        self._OR_info.append(OperationRegion(
-                            scope=item.scope,
-                            name=OR_name[0],
-                            storage=OR_info.group(1),
-                            offset=offset,
-                            length=OR_info.group(2)
-                        ))
-                    except AttributeError:
-                        continue
+                    # for item in OR_full:
+                OR_info = OR_name.split(',')
+                OR_info = list(map(lambda arg: arg.strip(), OR_info))
+                try:
+                    self._OR_info.append(OperationRegion(
+                        scope=item.scope,
+                        name=OR_info[0],
+                        storage=OR_info[1],
+                        offset=OR_info[2],
+                        length=OR_info[3]
+                    ))
+                except AttributeError:
+                    continue
         if VERBOSE:
             for item in self._OR_info:
                 print(item)
@@ -144,9 +137,8 @@ class AutoGen:
         if VERBOSE:
             print(
                 'Into: find_field(): Finding out which unit field is going to be patched inside EC scope.')
-        for OR in self._OR_info:
-            OR_path = OR.scope + '.' + OR.name
-            blocks = self.gc.get_content(OR_path)
+        for OR in self._OR_info.copy():
+            blocks = self.gc.get_content(OR.path)
             content = ''
             for block in blocks:
                 content += block.content + '\n'
@@ -175,7 +167,7 @@ class AutoGen:
                                 name=name,
                                 offset=int(offset_bits / 8),
                                 size=size,
-                                OR_path=OR_path
+                                OR_path=OR.path
                             ))
                             store_flag = True
                         offset_bits += size
@@ -301,7 +293,7 @@ class AutoGen:
                             print('Parsing', unit)
                         unit_path = '.'.join(unit.OR_path.split('.')[:-1])
 
-                        # Patch field writing, e.g. UNIT = xxxx
+                        # Patch field writing, e.g. `UNIT = xxxx`
                         reserve = re.findall(
                             r'^([\t \(]*)%s = (.*)' % unit.name, method_content, re.MULTILINE)
                         for item in reserve:
@@ -318,7 +310,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field writing, e.g. Store (xxxx, UNIT)
+                        # Patch field writing, e.g. `Store (xxxx, UNIT)`
                         reserve = re.findall(
                             'Store \\((\\w+), %s\\)' % unit.name, method_content)
                         for item in reserve:
@@ -335,7 +327,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field writing, e.g. ECWT (data, RefOf (UNIT)) to WECB(offset, size, data)
+                        # Patch field writing, e.g. `ECWT (data, RefOf (UNIT))` to `WECB(offset, size, data)`
                         reserve = re.findall(
                             r'(.*)ECWT \((.*), RefOf \(%s\)\)(.*)' % unit.name, method_content)
                         for item in reserve:
@@ -352,7 +344,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field reading, e.g. xxxx = ECRD (RefOf (UNIT)) to xxxx = RECB(offset, size)
+                        # Patch field reading, e.g. `xxxx = ECRD (RefOf (UNIT))` to `xxxx = RECB(offset, size)`
                         reserve = re.findall(
                             r'(.*)ECRD \(RefOf \(%s\)\)(.*)' % unit.name, method_content)
                         for item in reserve:
@@ -369,9 +361,9 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field reading, e.g. xxxx = UNIT
+                        # Patch field reading, e.g. `xxxx = UNIT` or `If (UNIT)`
                         reserve = re.findall(
-                            r'(^.*[^\.a-zA-Z/])%s([^a-zA-Z0-9,\.\n][^\(])' % unit.name, method_content, re.MULTILINE)
+                            r'(.*[^\.a-zA-Z/])%s(\n\))' % unit.name, method_content)  # , re.MULTILINE)
                         for item in reserve:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
@@ -387,7 +379,25 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field writing, e.g. EC0.UNIT = xxxx
+                        # Patch field reading, e.g. `Divide (0x00030D40, UNIT, Local2, Arg1 [0x06])`
+                        reverse = re.findall(r'(.*[^\.a-zA-Z/])%s([,\s\)][^\(].[^\s])' %
+                                             unit.name, method_content)  # , re.MULTILINE)
+                        for item in reverse:
+                            if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
+                                continue  # stop patching method that have the same name as fieldunit
+                            target = item[0] + unit.name + item[1]
+                            for line in it_lines:
+                                if target in line:
+                                    replace = '%s%s (%s + %s, %s)%s' % (
+                                        item[0], OR.RECB, unit.offset, OR.offset, unit.size, item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit.name
+                                    method_content = self._method[scope][method]['content'] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self._method[scope][method]['modified'] = True
+
+                        # Patch field writing, e.g. `EC0.UNIT = xxxx`
                         reserve = re.findall(
                             r'(.*%s\.)%s = (\\w+)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
@@ -404,7 +414,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field writing, e.g. Store (xxxx, EC0.UNIT)
+                        # Patch field writing, e.g. `Store (xxxx, EC0.UNIT)`
                         reserve = re.findall(
                             'Store \\((\\w+), (.*%s.)%s\\)' % (
                                 unit.OR_path.split('.')[-2], unit.name
@@ -423,7 +433,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field writing, e.g. ECWT (data, RefOf (EC0.UNIT)) to WECB(offset, size, data)
+                        # Patch field writing, e.g. `ECWT (data, RefOf (EC0.UNIT))` to `WECB(offset, size, data)`
                         reserve = re.findall(
                             r'(.*)ECWT \((.*), RefOf \((.*%s\.)%s\)\)(.*)' % (
                                 unit.OR_path.split('.')[-2], unit.name
@@ -442,7 +452,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field reading, e.g. xxxx = EC0.ECRD (RefOf (EC0.UNIT)) to xxxx = B1B2 (ECRD (RefOf (UNI0)), ECRD (RefOf (UNI1)))
+                        # Patch field reading, e.g. `xxxx = EC0.ECRD (RefOf (EC0.UNIT))` to `xxxx = RECB (Offset, Size)`
                         reserve = re.findall(
                             r'(.*)ECRD \(RefOf \((.*%s\.)%s\)\)(.*)' % (
                                 unit.OR_path.split('.')[-2], unit.name
@@ -461,7 +471,7 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field reading, e.g. xxxx = EC0.UNIT
+                        # Patch field reading, e.g. `xxxx = EC0.UNIT`
                         reserve = re.findall(
                             r'(.*%s\.)%s([\) ]*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
@@ -483,12 +493,12 @@ class AutoGen:
         # TODO: Multiple battery
         content = []
         try:
-            content += self.gc.search('Notify\s\(BAT[0123]', regex=True)
+            content += self.gc.search('Notify\s\(BAT[0123]', regex=True, blk_type='Method')
             for EC in self._PNP0C09:
                 a = 'Notify\s\(%s\.%s\.BAT[0123]' % (EC.scope.replace('\\', '\\\\').replace('.', '\.'), EC.name)
-                content += self.gc.search(a, regex=True)
+                content += self.gc.search(a, regex=True, blk_type='Method')
                 a = a.replace('\\\\', '')
-                content += self.gc.search(a, regex=True)
+                content += self.gc.search(a, regex=True, blk_type='Method')
         except RuntimeError:
             pass
         for item in content:

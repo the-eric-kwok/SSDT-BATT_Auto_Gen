@@ -4,19 +4,19 @@ from FieldUnit import FieldUnit
 
 
 class OperationRegion:
-    _field_units = []
     RE1B = ""
     RECB = ""
     ERM2 = ""
     WE1B = ""
     WECB = ""
 
-    def __init__(self, scope: str, name: str, storage: str, offset, length: int):
+    def __init__(self, scope: str, name: str, storage: str, offset: str, length: str):
         self._scope = scope
         self._name = name
         self._storage = storage
         self._offset = offset
         self._length = length
+        self._field_units = []
 
     @property
     def scope(self):
@@ -41,6 +41,12 @@ class OperationRegion:
     @property
     def field_units(self):
         return self._field_units
+
+    @property
+    def path(self):
+        if self.scope == '\\':
+            return self._scope + self._name
+        return self._scope + '.' + self._name
 
     def append_unit(self, unit: FieldUnit):
         self._field_units.append(unit)

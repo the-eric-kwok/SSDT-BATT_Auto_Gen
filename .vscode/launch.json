@@ -8,7 +8,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "Sample/DSDT_ThinkPad_Helix_2nd_Hand_Held.dsl"
+                "Sample/DSDT_HUAWEI_Magicbook.dsl"
             ]
         }
     ]
