@@ -112,19 +112,21 @@ class AutoGen:
                     if len(OR_full) == 0:
                         OR_list.remove(OR_name)
                         break
-                    # for item in OR_full:
-                OR_info = OR_name.split(',')
-                OR_info = list(map(lambda arg: arg.strip(), OR_info))
-                try:
-                    self._OR_info.append(OperationRegion(
-                        scope=item.scope,
-                        name=OR_info[0],
-                        storage=OR_info[1],
-                        offset=OR_info[2],
-                        length=OR_info[3]
-                    ))
-                except AttributeError:
-                    continue
+                else:
+                    OR_info = OR_name.split(',')
+                    OR_info = list(map(lambda arg: arg.strip(), OR_info))
+                    try:
+                        self._OR_info.append(OperationRegion(
+                            scope=item.scope,
+                            name=OR_info[0],
+                            storage=OR_info[1],
+                            offset=OR_info[2],
+                            length=OR_info[3]
+                        ))
+                    except AttributeError:
+                        continue
+                continue
+
         if VERBOSE:
             for item in self._OR_info:
                 print(item)
