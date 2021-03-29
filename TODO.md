@@ -64,7 +64,7 @@
 }
     ```
 
-- [ ] BAT0._BST 中删除
+- [x] BAT0._BST 中删除
     ```
     If (LEqual (BRTE, Zero))
     {

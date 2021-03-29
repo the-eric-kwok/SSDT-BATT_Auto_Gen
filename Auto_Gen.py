@@ -676,6 +676,31 @@ class AutoGen:
             else:
                 __patch_ACEL__(self)
 
+        wrong_BST = [r'If\s\(LEqual\s\(BRTE,\sZero\)\)\s*\{\s*Store\s\(0xFFFFFFFF,\sIndex\s\(PBST,\sOne\)\)\s*\}',
+                     r'If\s\(LEqual\s\(Zero,\sBRTE\)\)\s*\{\s*Store\s\(0xFFFFFFFF,\sIndex\s\(PBST,\sOne\)\)\s*\}',
+                     r'If\s\(\(BRTE\s==\sZero\)\)\s*\{\s*PBST\s\[One\]\s=\s0xFFFFFFFF\s*\}',
+                     r'If\s\(BRTE\s==\sZero\)\s*\{\s*PBST\s\[One\]\s=\s0xFFFFFFFF\s*\}',
+                     r'If\s\(\(Zero\s==\sBRTE\)\)\s*\{\s*PBST\s\[One\]\s=\s0xFFFFFFFF\s*\}',
+                     r'If\s\(Zero\s==\sBRTE\)\s*\{\s*PBST\s\[One\]\s=\s0xFFFFFFFF\s*\}']
+        result = []
+        for item in wrong_BST:
+            result += self.gc.search(item, blk_type='Method', regex=True)
+        for item in result:
+            if item.scope in self._method:
+                if item.name in self._method[item.scope]:
+                    for i in wrong_BST:
+                        self._method[item.scope][item.name]['content'] = re.sub(i, '',
+                                                                                self._method[item.scope][item.name])
+                else:
+                    for i in wrong_BST:
+                        item.content = re.sub(i, '', item.content)
+                    self._method[item.scope][item.name] = {'content': item.content, 'modified': True}
+            else:
+                for i in wrong_BST:
+                    item.content = re.sub(i, '', item.content)
+                self._method[item.scope] = {item.name: {'content': item.content, 'modified': True}}
+            pass
+
     def _generate_comment(self):
         # Find mutex and set them to zero
         self._patch_list = []
