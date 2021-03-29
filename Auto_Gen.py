@@ -937,7 +937,7 @@ def parse_args():
         if '.aml' in arg or '.dat' in arg:
             if os.path.exists('./iasl') and os.sys.platform == 'darwin':
                 # print('file: '+arg)
-                with os.popen("./iasl -d ' % s' 2>&1" % arg) as p:
+                with os.popen("./iasl -d '%s' 2>&1" % arg) as p:
                     ret = p.read()
                     if 'ASL Output' in ret:
                         print(DECOMPILE_SUCCESS_MSG)
@@ -946,7 +946,7 @@ def parse_args():
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
                 # print('file: '+arg)
-                with os.popen(".\\iasl.exe -d ' % s' 2>&1" % arg) as p:
+                with os.popen(".\\iasl.exe -d '%s' 2>&1" % arg) as p:
                     ret = p.read()
                     if 'ASL Output' in ret:
                         print(DECOMPILE_SUCCESS_MSG)
