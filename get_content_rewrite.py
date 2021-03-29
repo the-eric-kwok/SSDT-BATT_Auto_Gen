@@ -206,7 +206,7 @@ class GetContent:
                 if item.name == target:
                     result.append(item)
         if len(result) == 0:
-            raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
+            print("Warning: Terget '%s' in given block type '%s' not found!" % (target, blk_type))
         return result
 
     def search(self, target: str, blk_type='', regex=False, ignorecase=False) -> list:
@@ -257,7 +257,7 @@ class GetContent:
             if item.scope + '.' + item.name not in min_granularity:
                 result.remove(item)
         if len(result) == 0:
-            raise RuntimeError("Terget '%s' in given block type '%s' not found!" % (target, blk_type))
+            print("Warning: Terget '%s' in given block type '%s' not found!" % (target, blk_type))
         return result
 
 def load_file():
