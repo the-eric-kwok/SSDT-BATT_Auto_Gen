@@ -315,7 +315,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. `Store (xxxx, UNIT)`
                         reserve = re.findall(
-                            'Store \\((\\w+), %s\\)' % unit.name, method_content)
+                            r'Store \((\w+), %s\)' % unit.name, method_content)
                         for item in reserve:
                             target = 'Store (%s, %s)' % (
                                 item, unit.name)
@@ -420,7 +420,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. `EC0.UNIT = xxxx`
                         reserve = re.findall(
-                            r'(.*%s\.)%s = (\\w+)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
+                            r'(.*%s\.)%s = (\w+)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = '%s%s = %s' % (
                                 item[0], unit.name, item[1])
@@ -437,7 +437,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. `Store (xxxx, EC0.UNIT)`
                         reserve = re.findall(
-                            'Store \\((\\w+), (.*%s.)%s\\)' % (
+                            r'Store \((\w+), (.*%s.)%s\)' % (
                                 unit.OR_path.split('.')[-2], unit.name
                             ), method_content)
                         for item in reserve:
