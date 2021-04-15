@@ -88,6 +88,7 @@ class AutoGen:
             r'Firmware Error.*\n', '', self._dsdt_content)
         # Remove empty lines
         self._dsdt_content = re.sub(r'^\n', '', self._dsdt_content)
+        self._dsdt_content = '\n'.join([line.strip() for line in self._dsdt_content.splitlines()])
 
     def _find_OperationRegion(self):
         '''
@@ -287,10 +288,10 @@ class AutoGen:
                     if VERBOSE:
                         print('\n%s\n| Patching: %s |\n%s' % (
                             '=' * (14 + len(method)), method, '=' * (14 + len(method))))
-                        if 'GCMD' in method:
+                        if 'SBDV' in method_content:
                             print('trigger')
                     for unit in OR.field_units:
-                        it_lines = iter(method_content.splitlines())
+                        lines = method_content.splitlines()
                         if VERBOSE:
                             print('Parsing', unit)
                         unit_path = '.'.join(unit.OR_path.split('.')[:-1])
@@ -301,7 +302,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%s%s = %s' % (
                                 item[0], unit.name, item[1])
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s, %s)' % (
                                         item[0], OR.WECB, unit.offset, OR.offset, unit.size, item[1])
@@ -318,7 +319,7 @@ class AutoGen:
                         for item in reserve:
                             target = 'Store (%s, %s)' % (
                                 item, unit.name)
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s (%s + %s, %s, %s)' % (
                                         OR.WECB, unit.offset, OR.offset, unit.size, item)
@@ -335,7 +336,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECWT (%s, RefOf (%s))%s' % (
                                 item[0], item[1], unit.name, item[2])
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s, %s)' % (
                                         item[0], OR.WECB, unit.offset, OR.offset, unit.size, item[1])
@@ -352,7 +353,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECRD (RefOf (%s))%s' % (
                                 item[0], unit.name, item[1])
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s)%s' % (
                                         item[0], OR.RECB, unit.offset, OR.offset, unit.size, item[1])
@@ -363,14 +364,32 @@ class AutoGen:
                                     break
                             self._method[scope][method]['modified'] = True
 
-                        # Patch field reading, e.g. `xxxx = UNIT` or `If (UNIT)`
+                        # Patch field reading, e.g. `xxxx = UNIT`
                         reserve = re.findall(
-                            r'(.*[^\.a-zA-Z/])%s(\n\))' % unit.name, method_content)  # , re.MULTILINE)
+                            r'(.*)\s=\s%s(.*)' % unit.name, method_content)  # , re.MULTILINE)
+                        for item in reserve:
+                            if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
+                                continue  # stop patching method that have the same name as fieldunit
+                            target = '%s = %s%s' % (item[0], unit.name, item[1])
+                            for line in lines:
+                                if target in line:
+                                    replace = '%s = %s (%s + %s, %s)%s' % (
+                                        item[0], OR.RECB, unit.offset, OR.offset, unit.size, item[1])
+                                    replace = line.replace(
+                                        target, replace) + ' //%s' % unit.name
+                                    method_content = self._method[scope][method]['content'] = method_content.replace(
+                                        line, replace)
+                                    break
+                            self._method[scope][method]['modified'] = True
+
+                        # Patch field reading, e.g. `If (UNIT)`
+                        reserve = re.findall(
+                            r'(.*[^\.a-zA-Z/])%s([\n\)])' % unit.name, method_content)  # , re.MULTILINE)
                         for item in reserve:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
                             target = item[0] + unit.name + item[1]
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s)%s' % (
                                         item[0], OR.RECB, unit.offset, OR.offset, unit.size, item[1])
@@ -388,7 +407,7 @@ class AutoGen:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
                             target = item[0] + unit.name + item[1]
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s)%s' % (
                                         item[0], OR.RECB, unit.offset, OR.offset, unit.size, item[1])
@@ -405,7 +424,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%s%s = %s' % (
                                 item[0], unit.name, item[1])
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s, %s)' % (
                                         item[0], OR.WECB, unit.offset, OR.offset, unit.size, item[1])
@@ -424,7 +443,7 @@ class AutoGen:
                         for item in reserve:
                             target = 'Store (%s, %s%s)' % (
                                 item[0], item[1], unit.name)
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s, %s)' % (
                                         item[1], OR.WECB, unit.offset, OR.offset, unit.size, item[0])
@@ -443,7 +462,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECWT (%s, RefOf (%s%s))%s' % (
                                 item[0], item[1], item[2], unit.name, item[3])
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s, %s)' % (
                                         item[0], OR.WECB, unit.offset, OR.offset, unit.size, item[1])
@@ -462,7 +481,7 @@ class AutoGen:
                         for item in reserve:
                             target = '%sECRD (RefOf (%s%s))%s' % (
                                 item[0], item[1], unit.name, item[2])
-                            for line in it_lines:
+                            for line in lines:
                                 if target in line:
                                     replace = '%s%s (%s + %s, %s)%s' % (
                                         item[0], OR.RECB, unit.offset, OR.offset, unit.size, item[2])
@@ -478,7 +497,7 @@ class AutoGen:
                             r'(.*%s\.)%s([\) ]*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = item[0] + unit.name + item[1]
-                            for line in it_lines:
+                            for line in lines:
                                 if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                     continue  # stop patching method that have the same name as fieldunit
                                 if target in line:
