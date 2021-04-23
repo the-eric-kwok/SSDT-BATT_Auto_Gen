@@ -8,7 +8,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "Sample/DSDT_HUAWEI_Magicbook.dsl"
+                "-v",
+                "Sample/DSDT_Rewrite_patch_method.dsl"
             ]
         }
     ]

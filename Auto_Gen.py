@@ -288,7 +288,7 @@ class AutoGen:
                     if VERBOSE:
                         print('\n%s\n| Patching: %s |\n%s' % (
                             '=' * (14 + len(method)), method, '=' * (14 + len(method))))
-                        if 'SBDV' in method_content:
+                        if 'UPBI' in method_content:
                             print('trigger')
                     for unit in OR.field_units:
                         lines = method_content.splitlines()
@@ -493,8 +493,9 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field reading, e.g. `xxxx = EC0.UNIT`
+                        # TODO: temperary fix, needs rewrite.
                         reserve = re.findall(
-                            r'(.*%s\.)%s([\) ]*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
+                            r'(.*%s\.)%s([\) ]*.*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = item[0] + unit.name + item[1]
                             for line in lines:
@@ -992,7 +993,7 @@ def parse_args():
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
                 # print('file: '+arg)
-                with os.popen(".\\iasl.exe -d '%s' 2>&1" % arg) as p:
+                with os.popen(".\\iasl.exe -d \"%s\" 2>&1" % arg) as p:
                     ret = p.read()
                     if 'ASL Output' in ret:
                         print(DECOMPILE_SUCCESS_MSG)
