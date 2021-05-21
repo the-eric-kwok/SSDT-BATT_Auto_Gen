@@ -36,6 +36,7 @@ TRY_TO_COMPILE_ANYWAY = '\033[1;36miasl compiler not found in working directory,
 DANGEROUS_PATCH_MSG = ['\033[1;31mThis patch includes dangerous binary patch: ', '->',
                        ' You should review it before apply!!\n(Use Hex Fiend to extend the heximal code, make sure it\'s unique in whole DSDT.aml)\033[0m']
 NO_IASL_COMPILER = '\033[1;36miasl compiler not found in working directory, aborting.\033[0m'
+NEED_MANUALLY_PATCH = ['\033[1;31mMethod', 'needs manually patch for', '.\033[0m']
 
 try:
     LANG = locale.getdefaultlocale()[0]
@@ -82,3 +83,4 @@ Options:
     DANGEROUS_PATCH_MSG = ['\033[1;31m这个补丁包含了危险的二进制更名：', '->',
                            ' 您应该自行制作此更名补丁\n（使用 Hex Fiend 工具延长十六进制片段，以确保其唯一性）\033[0m']
     NO_IASL_COMPILER = '\033[1;36m当前目录下找不到 iasl 编译器，中止。\033[0m'
+    NEED_MANUALLY_PATCH = ['\033[1;31m方法', '需要手动补丁：', '\033[0m']

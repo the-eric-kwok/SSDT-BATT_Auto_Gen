@@ -1,3 +1,31 @@
+## 高优先级
+- [ ] 将 patch_method 中的 replace 改为用 MatchObject 对象的 .span() 方法获取起始偏移和结束偏移，并构造新的字符串来替换。循环执行直到 MatchObject 为 None。
+        （以便处理同样的语句在块中出现多次的情况，按照原本查找替换的方法只能替换第一个）
+- [ ] 多电池且不需要patch unit时生成多电池补丁
+
+## 低优先级
+- [ ] 支持 OC 0.6.8 中引入的 Base 和 BaseSkip 属性
+- [ ] 智能识别 clover 和 OC，并注入 plist 文件
+- [ ] 16 位变量拆分
+- [ ] 16 位使用 B1B2 读取
+- [ ] External 声明添加
+- [ ] FBST 设备
+    ```
+    into method label FBST code_regex If\s\(CHGS\s\(Zero\)\)[\s]+\{[\s]+Store\s\(0x02,\sLocal0\)[\s]+\}[\s]+Else[\s]+\{[\s]+Store\s\(One,\sLocal0\)[\s]+\} replaceall_matched begin
+    If (CHGS (Zero))\n
+    {\n
+    Store (0x02, Local0)\n
+    }\n
+    Else\n
+    {\n
+    Store (Zero, Local0)\n
+    }
+    end;
+```
+- [ ] External 声明添加
+
+
+## 已完成
 - [x] 使用栈（列表）成功解析了出 EC 的正确路径
 - [x] 层级的 Scope 处理
 - [x] 由 OperationRegion Name 搜索整个 DSDT，用 re.findall() 获得所有匹配的 Field
@@ -30,14 +58,8 @@
 - [x] 修复 patch_method 中对一个 unit 进行了多次替换的问题
 - [x] 修复导致 Sample/DSDT-ZHAOYANG K4-iwl.dsl 无法正确 patch 的 bug（猜测是在 patch_method() 内）(检查/SM2S方法的路径)
 - [x] 处理 DSDT 使用 ECRD、ECWT 来读写变量的情况(绕开ECRD使用RECB来读取)
-- [ ] 智能识别 clover 和 OC，并注入 plist 文件
-- [ ] 16 位变量拆分
-- [ ] 16 位使用 B1B2 读取
 - [x] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）
 - [x] 双电池补丁
-- [ ] 多电池且不需要patch unit时生成多电池补丁
-- [ ] External 声明添加
-
 - [x] ACEL.ADJT 中
     ```assembly
     ElseIf (LNotEqual (CNST, Zero))
@@ -72,17 +94,3 @@
         Store (0xFFFFFFFF, Index (PBST, One))
     }
     ```
-
-- [ ] FBST 设备
-    ```
-    into method label FBST code_regex If\s\(CHGS\s\(Zero\)\)[\s]+\{[\s]+Store\s\(0x02,\sLocal0\)[\s]+\}[\s]+Else[\s]+\{[\s]+Store\s\(One,\sLocal0\)[\s]+\} replaceall_matched begin
-    If (CHGS (Zero))\n
-    {\n
-    Store (0x02, Local0)\n
-    }\n
-    Else\n
-    {\n
-    Store (Zero, Local0)\n
-    }
-    end;
-```

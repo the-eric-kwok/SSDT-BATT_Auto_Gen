@@ -53,6 +53,7 @@ class AutoGen:
         self._find_OperationRegion()
         self._find_unit()
         self._patch_method()
+        self._check_patched_methods()
         self._PNP0C0A = self.gc.search('PNP0C0A', 'Device')
         for item in self._PNP0C0A.copy():
             a = re.findall(r'Method\s\(_STA,\s0,\sNotSerialized\)\s*\{\s*Return\s\(Zero\)\s*\}', item.content)
@@ -288,7 +289,7 @@ class AutoGen:
                     if VERBOSE:
                         print('\n%s\n| Patching: %s |\n%s' % (
                             '=' * (14 + len(method)), method, '=' * (14 + len(method))))
-                        if 'SBDV' in method_content:
+                        if 'UPBI' in method_content:
                             print('trigger')
                     for unit in OR.field_units:
                         lines = method_content.splitlines()
@@ -297,8 +298,7 @@ class AutoGen:
                         unit_path = '.'.join(unit.OR_path.split('.')[:-1])
 
                         # Patch field writing, e.g. `UNIT = xxxx`
-                        reserve = re.findall(
-                            r'^([\t \(]*)%s = (.*)' % unit.name, method_content, re.MULTILINE)
+                        reserve = re.findall(r'^([\t \(]*)%s\s*?=\s*?(.*)' % unit.name, method_content, re.MULTILINE)
                         for item in reserve:
                             target = '%s%s = %s' % (
                                 item[0], unit.name, item[1])
@@ -314,8 +314,7 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field writing, e.g. `Store (xxxx, UNIT)`
-                        reserve = re.findall(
-                            r'Store \((\w+), %s\)' % unit.name, method_content)
+                        reserve = re.findall(r'Store\s*?\((\w+),\s*?%s\)' % unit.name, method_content)
                         for item in reserve:
                             target = 'Store (%s, %s)' % (
                                 item, unit.name)
@@ -331,8 +330,7 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field writing, e.g. `ECWT (data, RefOf (UNIT))` to `WECB(offset, size, data)`
-                        reserve = re.findall(
-                            r'(.*)ECWT \((.*), RefOf \(%s\)\)(.*)' % unit.name, method_content)
+                        reserve = re.findall(r'(.*)ECWT\s*?\((.*),\s*?RefOf\s*?\(%s\)\)(.*)' % unit.name, method_content)
                         for item in reserve:
                             target = '%sECWT (%s, RefOf (%s))%s' % (
                                 item[0], item[1], unit.name, item[2])
@@ -348,8 +346,7 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field reading, e.g. `xxxx = ECRD (RefOf (UNIT))` to `xxxx = RECB(offset, size)`
-                        reserve = re.findall(
-                            r'(.*)ECRD \(RefOf \(%s\)\)(.*)' % unit.name, method_content)
+                        reserve = re.findall(r'(.*)ECRD\s*?\(\s*?RefOf\s*?\(\s*?%s\s*?\)\s*?\)(.*)' % unit.name, method_content)
                         for item in reserve:
                             target = '%sECRD (RefOf (%s))%s' % (
                                 item[0], unit.name, item[1])
@@ -365,8 +362,7 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field reading, e.g. `xxxx = UNIT`
-                        reserve = re.findall(
-                            r'(.*)\s=\s%s(.*)' % unit.name, method_content)  # , re.MULTILINE)
+                        reserve = re.findall(r'(.*)\s=\s%s(.*)' % unit.name, method_content)
                         for item in reserve:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
@@ -383,8 +379,7 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field reading, e.g. `If (UNIT)`
-                        reserve = re.findall(
-                            r'(.*[^\.a-zA-Z/])%s([\n\)])' % unit.name, method_content)  # , re.MULTILINE)
+                        reserve = re.findall(r'(.*[^\.a-zA-Z/])%s([\n\)])' % unit.name, method_content)
                         for item in reserve:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
@@ -401,8 +396,7 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field reading, e.g. `Divide (0x00030D40, UNIT, Local2, Arg1 [0x06])`
-                        reverse = re.findall(r'(.*[^\.a-zA-Z/])%s([,\s\)][^\(].[^\s])' %
-                                             unit.name, method_content)  # , re.MULTILINE)
+                        reverse = re.findall(r'(.*[^\.a-zA-Z/])%s([,\s\)][^\(].[^\s])' %unit.name, method_content)
                         for item in reverse:
                             if 'Method (' in item[0] or 'Device (' in item[0] or 'Scope (' in item[0]:
                                 continue  # stop patching method that have the same name as fieldunit
@@ -420,7 +414,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. `EC0.UNIT = xxxx`
                         reserve = re.findall(
-                            r'(.*%s\.)%s = (\w+)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
+                            r'(.*%s\.)%s\s*?=\s*?(\w+)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = '%s%s = %s' % (
                                 item[0], unit.name, item[1])
@@ -437,9 +431,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. `Store (xxxx, EC0.UNIT)`
                         reserve = re.findall(
-                            r'Store \((\w+), (.*%s.)%s\)' % (
-                                unit.OR_path.split('.')[-2], unit.name
-                            ), method_content)
+                            r'Store\s*?\((\w+),\s*?(.*%s.)%s\)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = 'Store (%s, %s%s)' % (
                                 item[0], item[1], unit.name)
@@ -456,9 +448,7 @@ class AutoGen:
 
                         # Patch field writing, e.g. `ECWT (data, RefOf (EC0.UNIT))` to `WECB(offset, size, data)`
                         reserve = re.findall(
-                            r'(.*)ECWT \((.*), RefOf \((.*%s\.)%s\)\)(.*)' % (
-                                unit.OR_path.split('.')[-2], unit.name
-                            ), method_content)
+                            r'(.*)ECWT\s*?\((.*),\s*?RefOf\s*?\((.*%s\.)%s\)\)(.*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = '%sECWT (%s, RefOf (%s%s))%s' % (
                                 item[0], item[1], item[2], unit.name, item[3])
@@ -475,9 +465,7 @@ class AutoGen:
 
                         # Patch field reading, e.g. `xxxx = EC0.ECRD (RefOf (EC0.UNIT))` to `xxxx = RECB (Offset, Size)`
                         reserve = re.findall(
-                            r'(.*)ECRD \(RefOf \((.*%s\.)%s\)\)(.*)' % (
-                                unit.OR_path.split('.')[-2], unit.name
-                            ), method_content)
+                            r'(.*)ECRD\s*?\(RefOf\s*?\((.*%s\.)%s\)\)(.*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = '%sECRD (RefOf (%s%s))%s' % (
                                 item[0], item[1], unit.name, item[2])
@@ -493,8 +481,9 @@ class AutoGen:
                             self._method[scope][method]['modified'] = True
 
                         # Patch field reading, e.g. `xxxx = EC0.UNIT`
+                        # TODO: temperary fix, needs rewrite.
                         reserve = re.findall(
-                            r'(.*%s\.)%s([\) ]*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
+                            r'(.*%s\.)%s([\) ]*.*)' % (unit.OR_path.split('.')[-2], unit.name), method_content)
                         for item in reserve:
                             target = item[0] + unit.name + item[1]
                             for line in lines:
@@ -509,6 +498,20 @@ class AutoGen:
                                         line, replace)
                                     break
                             self._method[scope][method]['modified'] = True
+        
+    def _check_patched_methods(self):
+        for scope in self._method:
+            for method in self._method[scope]:
+                is_dirty = False
+                dirty_units = []
+                content = re.sub(r"//.*", "", self._method[scope][method]['content'])
+                for OR in self._OR_info:
+                    for unit in OR.field_units:
+                        if unit.name in content:
+                            is_dirty = True
+                            dirty_units.append(unit)
+                if is_dirty:
+                    print(NEED_MANUALLY_PATCH[0], method, NEED_MANUALLY_PATCH[1], dirty_units, NEED_MANUALLY_PATCH[2])
 
     def _patch_dual_battery(self):
         # TODO: Multiple battery
@@ -992,7 +995,7 @@ def parse_args():
                         exit(1)
             elif os.path.exists('.\\iasl.exe') and os.sys.platform == 'win32':
                 # print('file: '+arg)
-                with os.popen(".\\iasl.exe -d '%s' 2>&1" % arg) as p:
+                with os.popen(".\\iasl.exe -d \"%s\" 2>&1" % arg) as p:
                     ret = p.read()
                     if 'ASL Output' in ret:
                         print(DECOMPILE_SUCCESS_MSG)
