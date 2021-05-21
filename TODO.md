@@ -35,6 +35,7 @@
 - [ ] 16 位使用 B1B2 读取
 - [x] 多个PNP0C09设备, 但只有一个启用（如 DSDT-Acel_A715-73G.aml ）
 - [x] 双电池补丁
+- [ ] 多电池且不需要patch unit时生成多电池补丁
 - [ ] External 声明添加
 
 - [x] ACEL.ADJT 中
