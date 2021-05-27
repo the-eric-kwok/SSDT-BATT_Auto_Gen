@@ -1,5 +1,6 @@
 # 使用范围缩小定位法重写搜索功能
 import re
+
 import CodeBlock as cb
 
 VERBOSE = False
@@ -73,7 +74,6 @@ class GetContent:
         stack = []
         blocks = []
         for i in rang:
-            _ = dsdt_content[i]
             if dsdt_content[i] == '{':
                 j = i - 1
                 rewind = ''

@@ -16,7 +16,6 @@ from multilanguage import *
 # Third party libraies
 try:
     import chardet
-
     __CHARDET__ = True
 except ImportError:
     __CHARDET__ = False
@@ -45,7 +44,7 @@ class AutoGen:
         self._filepath = file_path
         self._clean_out()
         self.gc = gc.GetContent(self._dsdt_content)
-        EC = self.gc.search('PNP0C09')
+        EC = self.gc.search('PNP0C09', 'Device')
         self._PNP0C09 = []
         for item in EC:
             EC_path = item.scope + '.' + item.name  # TODO Multiple EC support (Should just work)
