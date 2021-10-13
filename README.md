@@ -1,7 +1,13 @@
 # SSDT-BATT_Auto_Gen
 一个自动从 DSDT 中生成 SSDT-BATT 的 python 脚本
 
-**此工程已废弃**
+-------------------
+
+**此工程已废弃，请使用[ECEnabler](https://github.com/1Revenger1/ECEnabler)**
+
+**This project is abandoned, please use [ECEnabler](https://github.com/1Revenger1/ECEnabler) instead.**
+
+--------------------
 
 Copyright (c) 2020 郭耀铭 All Rights Reserved.
 
